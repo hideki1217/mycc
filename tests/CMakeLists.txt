@@ -1,11 +1,18 @@
 
-add_executable(util_test
-    util_test.c
+add_executable(test_util
+    test_util.c
 )
-target_link_libraries(util_test
+target_link_libraries(test_util
     util_lib    
 )
-target_include_directories(util_test PRIVATE ../)
+target_include_directories(test_util PRIVATE ../)
+
+add_executable(test_tokenize
+    ../tokenize.c
+    test_tokenize.c
+)
+target_include_directories(test_tokenize PRIVATE ../)
 
 
-add_test(NAME util_test COMMAND util_test)
+add_test(NAME test_util COMMAND test_util)
+add_test(NAME test_tokenize COMMAND test_tokenize)

@@ -37,14 +37,18 @@ void Map_free(Map* self);
 
 typedef struct Token {
   IDs id;
-  char* pos;
-  struct Token* next;
+  const char* pos;
+  struct Token* next; // NULLなら終端
 
   // Ident
-  char* ident;
+  // Str
+  int len;
 
   // Const Integer
-  long const_value;
+  long const_int;
+
+  // Const Float
+  double const_float;
 } Token;
 
-void tokenize(const char* content);
+extern Token *tokenize(const char* content);

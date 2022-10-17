@@ -7,6 +7,7 @@ enable_testing()
 add_library(util_lib STATIC util.c)
 
 add_executable(mycc
+    main.c
     mycc.h
     define.h
     tokenize.c

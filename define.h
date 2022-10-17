@@ -5,14 +5,15 @@
 #define S_MUL "*"
 #define S_DIV "/"
 #define S_MOD "%"
-#define S_DEREF "*"
-#define S_REF "&"
+// #define S_DEREF "*"
+// #define S_REF "&"
 #define S_NOT "~"
 #define S_AND "&"
 #define S_OR "|"
 #define S_XOR "^"
 #define S_USHFT "<<"
 #define S_DSHFT ">>"
+#define S_INSERT "="
 
 #define S_ADD_ASGN "+="
 #define S_SUB_ASGN "-="
@@ -41,7 +42,7 @@
 #define S_L1 "["
 #define S_R1 "]"
 #define S_L2 "{"
-#define S_R2 "{"
+#define S_R2 "}"
 
 #define S_C0 ","
 #define S_C1 ":"
@@ -80,7 +81,7 @@
 #define S_EXTERN "extern"
 
 #define S_CONST "const"
-#define S_VLTLE "volatile"ASGN
+#define S_VLTLE "volatile"
  
 typedef enum ID {
 ID_ADD,
@@ -88,14 +89,15 @@ ID_SUB,
 ID_MUL,
 ID_DIV,
 ID_MOD,
-ID_DEREF,
-ID_REF,
+// ID_DEREF,
+// ID_REF,
 ID_NOT,
 ID_AND,
 ID_OR,
 ID_XOR,
 ID_USHFT,
 ID_DSHFT,
+ID_INSERT,
 
 ID_ADD_ASGN,
 ID_SUB_ASGN,
@@ -108,7 +110,7 @@ ID_XOR_ASGN,
 ID_USHFT_ASGN,
 ID_DSHFT_ASGN,
 
-ID_LESID_THN,
+ID_LESS_THN,
 ID_GRTR_THN,
 ID_OR_LESS,
 ID_OR_GRTR,
@@ -166,5 +168,8 @@ ID_CONST,
 ID_VLTLE,
 
 ID_IDENT,
-ID_EOF,
+ID_CONST_INT,
+ID_CONST_FLOAT,
+ID_CONST_CHAR,
+ID_STR,
 } IDs;
