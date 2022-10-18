@@ -86,6 +86,21 @@
 
 #define S_CONST "const"
 #define S_VLTLE "volatile"
+
+#define S_PP_SYMBL "#"
+// #define S_PP_TOSTR "#"
+#define S_PP_CONCAT "##"
+#define S_PP_DEF "define"
+#define S_PP_IF "if"
+#define S_PP_IFDEF "ifdef"
+#define S_PP_IFNDEF "ifndef"
+#define S_PP_ELIF "elif"
+#define S_PP_ELSE "else"
+#define S_PP_ENDIF "endif"
+#define S_PP_PRAGMA "pragma"
+#define S_PP_UNDEF "undef"
+#define S_PP_INCLUDE "include"
+
  
 typedef enum ID {
 ID_ADD,
@@ -176,4 +191,18 @@ ID_CONST_INT,
 ID_CONST_FLOAT,
 ID_CONST_CHAR,
 ID_STR,
+
+ID_PP_SYMBL,
+// ID_PP_TOSTR,
+ID_PP_CONCAT,
+ID_PP_DEF,
+ID_PP_IF,
+ID_PP_IFDEF,
+ID_PP_IFNDEF,
+ID_PP_ELIF,
+ID_PP_ELSE,
+ID_PP_ENDIF,
+ID_PP_PRAGMA,
+ID_PP_UNDEF,
+ID_PP_INCLUDE,
 } IDs;

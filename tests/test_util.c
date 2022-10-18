@@ -43,6 +43,9 @@ int test_Map() {
   Map_push(map, "a11", 3, a + 3);
 
   assert(Map_empty(map) == false);
+  assert(Map_push(map, "a0", 2, a + 1) == false);
+  assert(Map_pushf(map, "a100", 4, a + 1) == a + 4);
+  assert(Map_pushf(map, "a100", 4, a + 4) == a + 1);
 
   assert(*(int*)Map_get(map, "a0", 2) == 0);
   assert(*(int*)Map_get(map, "a10", 3) == 2);

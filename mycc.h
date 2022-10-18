@@ -27,7 +27,8 @@ typedef struct Map {
   uint len;
 } Map;
 Map* Map_new();
-void Map_push(Map* self, const char* key, int n, void* item);
+bool Map_push(Map* self, const char* key, int n, void* item);
+void *Map_pushf(Map* self, const char* key, int n, void* item);
 void* Map_pop(Map* self, const char* key, int n);
 void* Map_get(Map* self, const char* key, int n);
 bool Map_empty(Map* self);

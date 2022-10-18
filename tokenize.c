@@ -188,6 +188,7 @@ static char read_char(const char* s, const char** ls) {
 Token* tokenize(const char* content) {
   Token _root;
 
+  Map macros;
   const char* cur = content;
 
   Token* tk = &_root;

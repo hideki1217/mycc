@@ -6,6 +6,30 @@ ahoaho
  
  he he
  */
+#ifdef HOGE
+aho
+#elif 
+unko
+#endif
+
+#define HOGE
+#ifdef HOGE
+aho
+#elif 
+unko
+#endif
+
+#define FUNC(a, b) \
+    (a, b) \
+    a ## b\
+    #a
+
+#define AA aa
+#define BB bb
+#define AABB abab
+FUNC(AA, BB)
+
+int main() {
     " aho b\
     cdef"
      '\xf' '\0' '\00' '\1\

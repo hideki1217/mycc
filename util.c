@@ -20,10 +20,10 @@ Vec* Vec_new() {
 }
 void Vec_push(Vec* self, void* item) {
   if (self->buf_l == self->len) {
-    void **dst = malloc(sizeof(void*) * self->buf_l * 2);
+    void** dst = malloc(sizeof(void*) * self->buf_l * 2);
     memcpy(dst, self->buf, sizeof(void*) * self->buf_l);
 
-    void **tmp = self->buf;
+    void** tmp = self->buf;
     self->buf = dst;
     self->buf_l *= 2;
     free(tmp);
@@ -33,7 +33,7 @@ void Vec_push(Vec* self, void* item) {
 }
 void* Vec_pop(Vec* self) {
   if (!Vec_empty(self)) {
-    void *tmp = self->buf[self->len-1];
+    void* tmp = self->buf[self->len - 1];
     self->len--;
     return tmp;
   }
@@ -97,6 +97,39 @@ bool MapNode_push(MapNode* self, const char* key, int n, void* item) {
   } else
     return false;
 }
+void* MapNode_pushf(MapNode* self, const char* key, int n, void* item) {
+  int cmp = strncmp(self->key, key, n);
+  if (cmp > 0 || (cmp == 0 && self->n > n)) {
+    if (self->lhs == NULL) {
+      MapNode* node = MapNode_new();
+      node->item = item;
+      node->key = mstrncpy(key, n);
+      node->n = n;
+
+      self->lhs = node;
+      return NULL;
+    } else {
+      return MapNode_pushf(self->lhs, key, n, item);
+    }
+  } else if (cmp < 0 || (cmp == 0 && self->n < n)) {
+    if (self->lhs == NULL) {
+      MapNode* node = MapNode_new();
+      node->item = item;
+      node->key = mstrncpy(key, n);
+      node->n = n;
+
+      self->rhs = node;
+      return NULL;
+    } else {
+      return MapNode_pushf(self->rhs, key, n, item);
+    }
+  } else {
+    // match self
+    void* tmp = self->item;
+    self->item = item;
+    return tmp;
+  }
+}
 void* MapNode_pop(MapNode* self, const char* key, int n) {
   int cmp = strncmp(self->key, key, n);
   if (cmp > 0 || (cmp == 0 && self->n > n)) {
@@ -151,7 +184,7 @@ Map* Map_new() {
   self->len = 0;
   return self;
 }
-void Map_push(Map* self, const char* key, int n, void* item) {
+bool Map_push(Map* self, const char* key, int n, void* item) {
   if (Map_empty(self)) {
     MapNode* node = MapNode_new();
     node->key = mstrncpy(key, n);
@@ -160,10 +193,33 @@ void Map_push(Map* self, const char* key, int n, void* item) {
 
     self->root = node;
     self->len++;
+    return true;
   } else {
-    if (MapNode_push(self->root, key, n, item)) {
+    bool is_pushed = MapNode_push(self->root, key, n, item);
+    if (is_pushed) {
       self->len++;
     }
+    return is_pushed;
+  }
+}
+void* Map_pushf(Map* self, const char* key, int n, void* item) {
+  /**
+   * @brief push force
+   * @return (exist) ? prev item : NULL
+   */
+  if (Map_empty(self)) {
+    MapNode* node = MapNode_new();
+    node->key = mstrncpy(key, n);
+    node->n = n;
+    node->item = item;
+
+    self->root = node;
+    self->len++;
+    return NULL;
+  } else {
+    void *tmp = MapNode_pushf(self->root, key, n, item);
+    if(tmp == NULL) self->len++;
+    return tmp;
   }
 }
 void* Map_pop(Map* self, const char* key, int n) {
