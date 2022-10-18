@@ -19,6 +19,19 @@ int is_alpha(char c) {
   return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z');
 }
 
+int char2int(char c, int base) {
+  assert(0 < base);
+  assert(base <= 36);
+  if (base <= 10) {
+    if ('0' <= c && c < '0' + base) return c - '0';
+  }
+  else {
+    if ('0' <= c && c < '0' + 10) return c - '0';
+    if ('a' <= c && c < 'a' + (base - 10)) return c - 'a' + 10;
+  }
+  return -1; 
+}
+
 bool match(const char* s, const char** ls, const char* word, int word_n) {
   if (strncmp(s, word, word_n) == 0) {
     *ls = s + word_n;
@@ -37,12 +50,11 @@ bool match_strict(const char* s, const char** ls, const char* word,
 
 long strntol(const char* s, const char** ls, int base, int n) {
   assert(n >= 2);
-  const char L = '0' + base - 1;
   long x = 0;
-  int i;
+  int i, val;
   for (i = 0; i < n; i++) {
-    if ('0' <= s[i] && s[i] <= L) {
-      x += s[i] - '0';
+    if ((val = char2int(s[i], base)) >= 0) {
+      x += val;
       x *= base;
     }
     else break;
