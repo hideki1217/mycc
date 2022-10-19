@@ -10,6 +10,7 @@ add_executable(mycc
     main.c
     mycc.h
     define.h
+    error.c
     tokenize.c
 )
 target_link_libraries(mycc util_lib)

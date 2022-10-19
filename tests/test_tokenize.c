@@ -5,9 +5,11 @@
 #include "mycc.h"
 
 int main() {
+  const char* path = "/home/hideki/Documents/repositories/mycc/tests/test_tokenize.txt";
+
   char* s = 0;
   long length;
-  FILE* f = fopen("/home/hideki/Documents/repositories/mycc/tests/test_tokenize.txt", "rb");
+  FILE* f = fopen(path, "rb");
 
   if (f) {
     fseek(f, 0, SEEK_END);
@@ -21,7 +23,7 @@ int main() {
   }
 
   if (s) {
-    Token* res = tokenize(s);
+    Token* res = tokenize(path, s);
     Token* tmp = res;
     while (tmp != NULL) {
       tmp = tmp->next;

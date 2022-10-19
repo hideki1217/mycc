@@ -50,6 +50,10 @@ void* Map__get(Map* self, const char* key, int n);
 bool Map__empty(Map* self);
 void Map__free(Map* self);
 
+// error.c
+
+void print_error(const char* name, const char* content, const char* pos, char *fmt, ...);
+
 // tokenize.c
 typedef struct Token {
   IDs id;
@@ -67,4 +71,4 @@ typedef struct Token {
   // double const_float;
 } Token;
 
-extern Token* tokenize(const char* content);
+extern Token* tokenize(const char* name, const char* content);

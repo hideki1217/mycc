@@ -9,6 +9,7 @@ target_include_directories(test_util PRIVATE ../)
 
 add_executable(test_tokenize
     ../tokenize.c
+    ../error.c
     test_tokenize.c
 )
 target_include_directories(test_tokenize PRIVATE ../)

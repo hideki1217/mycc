@@ -48,7 +48,7 @@ static const char* equal_n(const char* s, const char* x, int n) {
 }
 static void copy_n(char* dst, const char* src, int n) {
   const char* tmp = src;
-  for(int i=0; i<n; i++) {
+  for (int i = 0; i < n; i++) {
     dst[i] = *tmp;
     tmp = next(tmp);
   }
@@ -185,11 +185,16 @@ static char read_char(const char* s, const char** ls) {
   }
 }
 
-Token* tokenize(const char* content) {
+Token* tokenize(const char* name, const char* content) {
   Token _root;
 
   Map macros;
   const char* cur = content;
+#define ERROR(pos_, ...)                             \
+  do {                                               \
+    print_error(name, content, (pos_), __VA_ARGS__); \
+    abort();                                         \
+  } while (false)
 
   Token* tk = &_root;
   while (*cur != '\0') {
@@ -199,13 +204,14 @@ Token* tokenize(const char* content) {
     }
     if (match(cur, &cur, S_LINE_COM, sizeof(S_LINE_COM) - 1)) {
       const char* tmp = find_char(cur, '\n');
-      assert(tmp != NULL);
+      if (tmp == NULL) break;  // find_char read to end
       cur = next(tmp);
       continue;
     }
     if (match(cur, &cur, S_BLCK_COML, sizeof(S_BLCK_COML) - 1)) {
       const char* tmp = find_str(cur, S_BLCK_COMR, sizeof(S_BLCK_COMR) - 1);
-      assert(tmp != NULL);
+      if (tmp == NULL)
+        ERROR(cur - sizeof(S_BLCK_COML) + 1, "Comment is not closed");
       cur = next_n(tmp, sizeof(S_BLCK_COMR) - 1);
       continue;
     }
@@ -305,7 +311,7 @@ Token* tokenize(const char* content) {
     {
       const char* tmp;
       long x = strntol(cur, &tmp, 10, 128);
-      assert(*tmp != '.');
+      if (*tmp == '.') ERROR(cur, "Not support float");
       if (tmp != cur) {
         tk = Token_new(tk);
         tk->id = ID_CONST_INT;
@@ -333,7 +339,7 @@ Token* tokenize(const char* content) {
       const char* tmp = next(cur);
       int c = read_char(tmp, &tmp);
       assert(tmp != next(cur));
-      assert(*tmp == '\'');
+      if (*tmp != '\'') ERROR(tmp, "expected \'\\\'\' ");
 
       tk = Token_new(tk);
       tk->id = ID_CHAR;
@@ -344,7 +350,7 @@ Token* tokenize(const char* content) {
       continue;
     }
     if (*cur == '\"') {
-      int len=0;
+      int len = 0;
       const char* tmp = next(cur);
       while (*tmp != '\"' && *tmp != '\0') {
         if (*tmp == '\\') {
@@ -354,7 +360,7 @@ Token* tokenize(const char* content) {
         tmp = next(tmp);
         len++;
       }
-      assert(*tmp != '\0');
+      if (*tmp == '\0') ERROR(cur, "this should be closed");
       char* str = malloc(len + 1);
       copy_n(str, next(cur), len);
       str[len] = '\0';
@@ -374,7 +380,7 @@ Token* tokenize(const char* content) {
         tmp = next(tmp);
         len++;
       }
-      char *ident = malloc(len + 1);
+      char* ident = malloc(len + 1);
       copy_n(ident, cur, len);
       ident[len] = '\0';
 
@@ -387,7 +393,7 @@ Token* tokenize(const char* content) {
       continue;
     }
 
-    abort();
+    ERROR(cur, "Internal Error: cannot tokenize");
   }
 
   return _root.next;
