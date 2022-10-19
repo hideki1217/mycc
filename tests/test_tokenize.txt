@@ -1,12 +1,7 @@
-int ma\
-in() {
-// ahoaho\
-ahoaho
-/* unkounko
- 
- he he
- */
-#ifdef HOGE
+#  include "hogehoge.h" 
+#include <hugahuga.h> aho
+
+# ifdef HOGE
 aho
 #elif 
 unko
@@ -28,6 +23,15 @@ unko
 #define BB bb
 #define AABB abab
 FUNC(AA, BB)
+
+int ma\
+in() {
+// ahoaho\
+ahoaho
+/* unkounko
+ 
+ he he
+ */
 
 int main() {
     " aho b\

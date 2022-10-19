@@ -197,7 +197,19 @@ Token* tokenize(const char* name, const char* content) {
   } while (false)
 
   Token* tk = &_root;
+  int macro_mode = false;
   while (*cur != '\0') {
+    if (macro_mode) {
+      if (*cur == '\n') {
+        tk = Token_new(tk);
+        tk->id = ID_PP_END;
+        tk->pos = cur;
+
+        cur = next(cur);
+        macro_mode = false;
+        continue;
+      }
+    }
     if (is_space(*cur)) {
       cur = next(cur);
       continue;
@@ -214,6 +226,33 @@ Token* tokenize(const char* name, const char* content) {
         ERROR(cur - sizeof(S_BLCK_COML) + 1, "Comment is not closed");
       cur = next_n(tmp, sizeof(S_BLCK_COMR) - 1);
       continue;
+    }
+    if (macro_mode == ID_PP_INCLUDE) {
+      if (*cur == '<') {
+        int n;
+        const char *last_not_space = cur, *tmp = cur;
+        for (int i = 0;; i++) {
+          if (*tmp == '>') break;
+          if (*tmp == '\n') {
+            n = -1;
+            break;
+          }
+          if (!is_space(*tmp)) last_not_space = tmp, n = i;
+          tmp++;
+        }
+        if (n == -1) ERROR(last_not_space, "missing terminating > character");
+
+        char* s = malloc(n + 1);
+        copy_n(s, next(cur), n), s[n] = '\0';
+
+        tk = Token_new(tk);
+        tk->id = ID_PP_INCLUDE_PATH;
+        tk->pos = cur;
+        tk->corrected = s;
+
+        cur = next(tmp);
+        continue;
+      }
     }
 
 #define match_symbol(name_)                                   \
@@ -269,6 +308,21 @@ Token* tokenize(const char* name, const char* content) {
     match_symbol(C0);
     match_symbol(C1);
     match_symbol(C2);
+
+    match_symbol(PP_CONCAT);
+    {  // PP_SYMBL
+      const char* tmp;
+      if (match(cur, &tmp, S_PP_SYMBL, sizeof(S_PP_SYMBL) - 1)) {
+        tk = Token_new(tk);
+        tk->id = ID_PP_SYMBL;
+        tk->pos = cur;
+        cur = tmp;
+        if (!macro_mode) {
+          macro_mode = true;
+        }
+        continue;
+      }
+    }
 #define match_reserved(name_)                                        \
   {                                                                  \
     const char* tmp;                                                 \
@@ -308,6 +362,29 @@ Token* tokenize(const char* name, const char* content) {
     match_reserved(CONST);
     match_reserved(VLTLE);
 
+    if (macro_mode) {
+      match_reserved(PP_DEFINED);
+      match_reserved(PP_IFNDEF);
+      match_reserved(PP_IFDEF);
+      match_reserved(PP_IF);
+      match_reserved(PP_ELIF);
+      match_reserved(PP_ELSE);
+      match_reserved(PP_DEF);
+      match_reserved(PP_PRAGMA);
+      match_reserved(PP_ENDIF);
+      {  // PP_INCLUDE
+        const char* tmp;
+        if (match_strict(cur, &tmp, S_PP_INCLUDE, sizeof(S_PP_INCLUDE) - 1)) {
+          tk = Token_new(tk);
+          tk->id = ID_PP_INCLUDE;
+          tk->pos = cur;
+          cur = tmp;
+          macro_mode = ID_PP_INCLUDE;
+          continue;
+        }
+      }
+      match_reserved(PP_UNDEF);
+    }
     {
       const char* tmp;
       long x = strntol(cur, &tmp, 10, 128);
@@ -362,8 +439,7 @@ Token* tokenize(const char* name, const char* content) {
       }
       if (*tmp == '\0') ERROR(cur, "this should be closed");
       char* str = malloc(len + 1);
-      copy_n(str, next(cur), len);
-      str[len] = '\0';
+      copy_n(str, next(cur), len), str[len] = '\0';
 
       tk = Token_new(tk);
       tk->id = ID_STR;
@@ -381,8 +457,7 @@ Token* tokenize(const char* name, const char* content) {
         len++;
       }
       char* ident = malloc(len + 1);
-      copy_n(ident, cur, len);
-      ident[len] = '\0';
+      copy_n(ident, cur, len), ident[len] = '\0';
 
       tk = Token_new(tk);
       tk->id = ID_IDENT;

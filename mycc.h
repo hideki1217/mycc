@@ -52,7 +52,8 @@ void Map__free(Map* self);
 
 // error.c
 
-void print_error(const char* name, const char* content, const char* pos, char *fmt, ...);
+void print_error(const char* name, const char* content, const char* pos,
+                 char* fmt, ...);
 
 // tokenize.c
 typedef struct Token {
@@ -62,7 +63,8 @@ typedef struct Token {
 
   // Ident
   // Str
-  const char* corrected;  // 通常のstring.hが適用可能
+  // Include path
+  const char* corrected;  // 通常のstring.hが適用可能 所有権を持ってる
 
   // Const Integer
   long const_int;
