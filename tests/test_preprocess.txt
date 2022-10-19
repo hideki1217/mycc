@@ -1,0 +1,27 @@
+#include "test_preprocess2.txt"
+
+#ifdef COMP
+
+#include <stddef.h>
+
+#else
+
+#define AHOHO 56
+
+#endif
+
+#pragma once
+
+#pragma hoaho
+
+#ifndef AHOHO
+
+#define BHOHO
+
+#else 
+
+#define CHOHO 2
+
+#endif
+
+

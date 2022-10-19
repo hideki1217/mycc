@@ -10,6 +10,7 @@ add_library(mycc_lib STATIC
     error.c
     tokenize.c
     util.c
+    pp.c
 )
 
 add_executable(mycc

@@ -78,3 +78,7 @@ struct Token {
 #define tkislast(tk) ((tk)->id == ID_END)
 
 extern TokenList* tokenize(Context* context);
+
+// pp.c
+
+Token* preprocess(const char* name, const char* content, Token *input);
