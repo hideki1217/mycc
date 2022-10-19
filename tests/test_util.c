@@ -6,31 +6,32 @@
 int test_Vec() {
   int a[256];
   for (int i = 0; i < 256; i++) a[i] = i;
-  Vec* vec = Vec_new();
+  IntV* int_v = IntV_new();
 
-  assert(Vec_empty(vec) == true);
+  assert(IntV_empty(int_v) == true);
 
   for (int i = 0; i < 256; i++) {
-    Vec_push(vec, &a[i]);
+    int* ref = IntV_push(int_v);
+    *ref = a[i];
   }
 
-  assert(Vec_empty(vec) == false);
-  assert(*(int*)Vec_get(vec, 0) == 0);
-  assert(*(int*)Vec_get(vec, 2) == 2);
-  assert(*(int*)Vec_get(vec, 17) == 17);
+  assert(IntV_empty(int_v) == false);
+  assert(*IntV_get(int_v, 0) == 0);
+  assert(*IntV_get(int_v, 2) == 2);
+  assert(*IntV_get(int_v, 17) == 17);
 
-  assert(*(int*)Vec_pop(vec) == 255);
-  assert(*(int*)Vec_pop(vec) == 254);
+  IntV_pop(int_v);
+  IntV_pop(int_v);
 
   // assert(Vec_get(vec, 255) == NULL); // abort
 
-  Vec_free(vec);
+  IntV_free(int_v);
   return 0;
 }
 
 int test_Map() {
   int a[5];
-  for(int i=0; i<5; i++) a[i] = i;
+  for (int i = 0; i < 5; i++) a[i] = i;
 
   Map* map = Map_new();
 
@@ -60,6 +61,4 @@ int test_Map() {
   return 0;
 }
 
-int main() {
-  return test_Vec() && test_Map();
-}
+int main() { return test_Vec() && test_Map(); }

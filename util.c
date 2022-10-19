@@ -11,43 +11,46 @@ static char* mstrncpy(const char* src, int n) {
   return a;
 }
 
-Vec* Vec_new() {
-  Vec* self = malloc(sizeof(Vec));
-  self->buf_l = 8;
-  self->buf = malloc(sizeof(void*) * self->buf_l);
-  self->len = 0;
-  return self;
-}
-void Vec_push(Vec* self, void* item) {
-  if (self->buf_l == self->len) {
-    void** dst = malloc(sizeof(void*) * self->buf_l * 2);
-    memcpy(dst, self->buf, sizeof(void*) * self->buf_l);
-
-    void** tmp = self->buf;
-    self->buf = dst;
-    self->buf_l *= 2;
-    free(tmp);
+#define Vec_define(Self, Type)                                   \
+  Self* Self##_new() {                                           \
+    Self* self = malloc(sizeof(Self));                           \
+    self->buf_l = 8;                                             \
+    self->buf = malloc(sizeof(Type) * self->buf_l);              \
+    self->len = 0;                                               \
+    return self;                                                 \
+  }                                                              \
+  Type* Self##_push(Self* self) {                                \
+    if (self->buf_l == self->len) {                              \
+      Type* dst = malloc(sizeof(Type) * self->buf_l * 2);        \
+      memcpy(dst, self->buf, sizeof(Type) * self->buf_l);        \
+      Type* tmp = self->buf;                                     \
+      self->buf = dst;                                           \
+      self->buf_l *= 2;                                          \
+      free(tmp);                                                 \
+    }                                                            \
+    void* tmp = &self->buf[self->len];                           \
+    self->len += 1;                                              \
+    return tmp;                                                  \
+  }                                                              \
+  bool Self##_pop(Self* self) {                                  \
+    if (!Self##_empty(self)) {                                   \
+      self->len--;                                               \
+      return true;                                               \
+    }                                                            \
+    return false;                                                \
+  }                                                              \
+  Type* Self##_get(const Self* self, uint idx) {                 \
+    assert(self->len > idx);                                     \
+    return &(self->buf)[idx];                                    \
+  }                                                              \
+  bool Self##_empty(const Self* self) { return self->len == 0; } \
+  void Self##_free(Self* self) {                                 \
+    free(self->buf);                                             \
+    free(self);                                                  \
   }
-  self->buf[self->len] = item;
-  self->len += 1;
-}
-void* Vec_pop(Vec* self) {
-  if (!Vec_empty(self)) {
-    void* tmp = self->buf[self->len - 1];
-    self->len--;
-    return tmp;
-  }
-  return NULL;
-}
-void* Vec_get(const Vec* self, uint idx) {
-  assert(self->len > idx);
-  return self->buf[idx];
-}
-bool Vec_empty(const Vec* self) { return self->len == 0; }
-void Vec_free(Vec* self) {
-  free(self->buf);
-  free(self);
-}
+Vec_define(PtrV, void*);
+Vec_define(IntV, int);
+#undef Vec_define
 
 typedef struct MapNode {
   char* key;
@@ -217,8 +220,8 @@ void* Map_pushf(Map* self, const char* key, int n, void* item) {
     self->len++;
     return NULL;
   } else {
-    void *tmp = MapNode_pushf(self->root, key, n, item);
-    if(tmp == NULL) self->len++;
+    void* tmp = MapNode_pushf(self->root, key, n, item);
+    if (tmp == NULL) self->len++;
     return tmp;
   }
 }
