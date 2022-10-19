@@ -308,6 +308,7 @@ Token* tokenize(const char* name, const char* content) {
     match_symbol(C0);
     match_symbol(C1);
     match_symbol(C2);
+    match_symbol(QUEST);
 
     match_symbol(PP_CONCAT);
     {  // PP_SYMBL

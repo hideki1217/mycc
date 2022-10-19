@@ -14,6 +14,7 @@
 #define S_USHFT "<<"
 #define S_DSHFT ">>"
 #define S_INSERT "="
+#define S_QUEST "?"
 
 #define S_ADD_ASGN "+="
 #define S_SUB_ASGN "-="
@@ -117,6 +118,7 @@ typedef enum ID {
   ID_USHFT,
   ID_DSHFT,
   ID_INSERT,
+  ID_QUEST,
 
   ID_ADD_ASGN,
   ID_SUB_ASGN,
