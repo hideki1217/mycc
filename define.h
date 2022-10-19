@@ -48,6 +48,10 @@
 #define S_C1 ":"
 #define S_C2 ";"
 
+#define S_LINE_COM "//"
+#define S_BLCK_COML "/*"
+#define S_BLCK_COMR "*/"
+
 #define S_IF "if"
 #define S_ELSE "else"
 #define S_DO "do"

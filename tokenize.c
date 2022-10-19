@@ -2,121 +2,186 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+// #include <math.h>
 
 #include "define.h"
 #include "mycc.h"
 
-Token* Token_new(Token* prev) {
+static Token* Token_new(Token* prev) {
   Token* x = malloc(sizeof(Token));
   x->next = NULL;
   prev->next = x;
   return x;
 }
 
-int is_space(char c) { return c == ' ' || c == '\n' || c == '\t'; }
-int is_digit(char c) { return '0' <= c && c <= '9'; }
-int is_alpha(char c) {
+static int is_space(char c) { return c == ' ' || c == '\n' || c == '\t'; }
+static int is_digit(char c) { return '0' <= c && c <= '9'; }
+static int is_alpha(char c) {
   return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z');
 }
 
-int char2int(char c, int base) {
+static const char* next(const char* s) {
+  while (strncmp(s, "\\\n", sizeof("\\\n") - 1) == 0) {
+    s += sizeof("\\\n") - 1;
+  }
+  s++;
+  while (strncmp(s, "\\\n", sizeof("\\\n") - 1) == 0) {
+    s += sizeof("\\\n") - 1;
+  }
+  return s;
+}
+static const char* next_n(const char* s, int n) {
+  assert(n > 0);
+  for (int i = 0; i < n; i++) {
+    if (*s == '\0') return NULL;
+    s = next(s);
+  }
+  return s;
+}
+static const char* equal_n(const char* s, const char* x, int n) {
+  for (int i = 0; i < n; i++) {
+    if (*s != *x) return NULL;
+    s = next(s);
+    x = next(x);
+  }
+  return s;
+}
+static void copy_n(char* dst, const char* src, int n) {
+  const char* tmp = src;
+  for(int i=0; i<n; i++) {
+    dst[i] = *tmp;
+    tmp = next(tmp);
+  }
+}
+static const char* find_char(const char* s, char c) {
+  while (*s != '\0') {
+    if (*s == c) return s;
+    s = next(s);
+  }
+  return NULL;
+}
+static const char* find_str(const char* s, const char* x, int x_len) {
+  while (*s != '\0') {
+    if (equal_n(s, x, x_len)) return s;
+    s = next(s);
+  }
+  return NULL;
+}
+static bool match(const char* s, const char** ls, const char* word,
+                  int word_n) {
+  const char* tmp;
+  if (tmp = equal_n(s, word, word_n)) {
+    *ls = tmp;
+    return true;
+  }
+  return false;
+}
+static bool match_strict(const char* s, const char** ls, const char* word,
+                         int word_n) {
+  const char* tmp;
+  if ((tmp = equal_n(s, word, word_n)) && is_space(*tmp)) {
+    *ls = tmp;
+    return true;
+  }
+  return false;
+}
+
+static int char2int(char c, int base) {
   assert(0 < base);
   assert(base <= 36);
   if (base <= 10) {
     if ('0' <= c && c < '0' + base) return c - '0';
-  }
-  else {
+  } else {
     if ('0' <= c && c < '0' + 10) return c - '0';
     if ('a' <= c && c < 'a' + (base - 10)) return c - 'a' + 10;
   }
-  return -1; 
+  return -1;
 }
-
-bool match(const char* s, const char** ls, const char* word, int word_n) {
-  if (strncmp(s, word, word_n) == 0) {
-    *ls = s + word_n;
-    return true;
-  }
-  return false;
-}
-bool match_strict(const char* s, const char** ls, const char* word,
-                  int word_n) {
-  if (strncmp(s, word, word_n) == 0 && is_space(s[word_n])) {
-    *ls = s + word_n;
-    return true;
-  }
-  return false;
-}
-
-long strntol(const char* s, const char** ls, int base, int n) {
-  assert(n >= 2);
+static long strntol(const char* s, const char** ls, int base, int n) {
+  assert(base >= 2);
   long x = 0;
-  int i, val;
-  for (i = 0; i < n; i++) {
-    if ((val = char2int(s[i], base)) >= 0) {
-      x += val;
+  int val;
+  for (int i = 0; i < n; i++) {
+    if ((val = char2int(*s, base)) >= 0) {
       x *= base;
-    }
-    else break;
+      x += val;
+      s = next(s);
+    } else
+      break;
   }
-  *ls = &s[i];
+  *ls = s;
   return x;
 }
-char read_char(const char* s, const char** ls) {
-  if (s[0] == '\\') {
+// static
+// double strntod(const char* s, const char** ls, int n) {
+//   assert(n >= 0);
+//   int x_n, y_n;
+//   long x, y;
+//   const char *tmp;
+//   x = strntol(s, &tmp, 10, n);
+//   x_n = tmp - s;
+//   if(*tmp != '.') return x;
+//   s = next(tmp);
+//   y = strntol(s, &tmp, 10, n - x_n);
+//   y_n = tmp - s;
+
+//   return (double)x + (double)y * pow(10, -y_n);
+// }
+static char read_char(const char* s, const char** ls) {
+  if (*s == '\\') {
     if (s[1] == 'a') {
-      *ls = s + 2;
+      *ls = next_n(s, 2);
       return '\a';
     }
     if (s[1] == 'b') {
-      *ls = s + 2;
+      *ls = next_n(s, 2);
       return '\b';
     }
     if (s[1] == 'f') {
-      *ls = s + 2;
+      *ls = next_n(s, 2);
       return '\f';
     }
     if (s[1] == 'n') {
-      *ls = s + 2;
+      *ls = next_n(s, 2);
       return '\n';
     }
     if (s[1] == 'r') {
-      *ls = s + 2;
+      *ls = next_n(s, 2);
       return '\r';
     }
     if (s[1] == 't') {
-      *ls = s + 2;
+      *ls = next_n(s, 2);
       return '\t';
     }
     if (s[1] == 'v') {
-      *ls = s + 2;
+      *ls = next_n(s, 2);
       return '\v';
     }
     if (s[1] == '\\') {
-      *ls = s + 2;
+      *ls = next_n(s, 2);
       return '\\';
     }
     if (s[1] == '\?') {
-      *ls = s + 2;
+      *ls = next_n(s, 2);
       return '\?';
     }
     if (s[1] == '\'') {
-      *ls = s + 2;
+      *ls = next_n(s, 2);
       return '\'';
     }
     if (s[1] == '\"') {
-      *ls = s + 2;
+      *ls = next_n(s, 2);
       return '\"';
     }
     if (s[1] == 'x') {
       /*16進数２桁*/
-      return strntol(s + 2, ls, 16, 2);
+      return strntol(next_n(s, 2), ls, 16, 2);
     }
     /*8進数3桁*/
-    return strntol(s + 1, ls, 8, 3);
+    return strntol(next(s), ls, 8, 3);
   } else {
-    *ls = s + 1;
-    return s[0];
+    *ls = next(s);
+    return *s;
   }
 }
 
@@ -126,9 +191,21 @@ Token* tokenize(const char* content) {
   const char* cur = content;
 
   Token* tk = &_root;
-  while (cur[0] != '\0') {
-    if (is_space(cur[0])) {
-      cur++;
+  while (*cur != '\0') {
+    if (is_space(*cur)) {
+      cur = next(cur);
+      continue;
+    }
+    if (match(cur, &cur, S_LINE_COM, sizeof(S_LINE_COM) - 1)) {
+      const char* tmp = find_char(cur, '\n');
+      assert(tmp != NULL);
+      cur = next(tmp);
+      continue;
+    }
+    if (match(cur, &cur, S_BLCK_COML, sizeof(S_BLCK_COML) - 1)) {
+      const char* tmp = find_str(cur, S_BLCK_COMR, sizeof(S_BLCK_COMR) - 1);
+      assert(tmp != NULL);
+      cur = next_n(tmp, sizeof(S_BLCK_COMR) - 1);
       continue;
     }
 
@@ -225,9 +302,10 @@ Token* tokenize(const char* content) {
     match_reserved(VLTLE);
 
     {
-      char* tmp;
-      long x = strtol(cur, &tmp, 10);
-      if (tmp != cur && tmp[0] != '.') {
+      const char* tmp;
+      long x = strntol(cur, &tmp, 10, 128);
+      assert(*tmp != '.');
+      if (tmp != cur) {
         tk = Token_new(tk);
         tk->id = ID_CONST_INT;
         tk->pos = cur;
@@ -238,60 +316,71 @@ Token* tokenize(const char* content) {
       }
     }
     {
-      char* tmp;
-      double x = strtod(cur, &tmp);
-      if (tmp != cur) {
-        tk = Token_new(tk);
-        tk->id = ID_CONST_FLOAT;
-        tk->pos = cur;
-        tk->const_float = x;
+      // const char* tmp;
+      // double x = strntod(cur, &tmp, 128);
+      // if (tmp != cur) {
+      //   tk = Token_new(tk);
+      //   tk->id = ID_CONST_FLOAT;
+      //   tk->pos = cur;
+      //   tk->const_float = x;
 
-        cur = tmp;
-        continue;
-      }
+      //   cur = tmp;
+      //   continue;
+      // }
     }
-    if (cur[0] == '\'') {
-      const char* tmp;
-      int c = read_char(&cur[1], &tmp);
-      assert(tmp != cur + 1);
-      assert(tmp[0] == '\'');
+    if (*cur == '\'') {
+      const char* tmp = next(cur);
+      int c = read_char(tmp, &tmp);
+      assert(tmp != next(cur));
+      assert(*tmp == '\'');
 
       tk = Token_new(tk);
       tk->id = ID_CHAR;
       tk->pos = cur;
       tk->const_int = c;
 
-      cur = tmp + 1;
+      cur = next(tmp);
       continue;
     }
-    if (cur[0] == '\"') {
-      const char* tmp = cur + 1;
+    if (*cur == '\"') {
+      int len=0;
+      const char* tmp = next(cur);
       while (*tmp != '\"' && *tmp != '\0') {
         if (*tmp == '\\') {
-          tmp++;
+          tmp = next(tmp);
+          len++;
         }
-        tmp++;
+        tmp = next(tmp);
+        len++;
       }
       assert(*tmp != '\0');
+      char* str = malloc(len + 1);
+      copy_n(str, next(cur), len);
+      str[len] = '\0';
 
       tk = Token_new(tk);
       tk->id = ID_STR;
       tk->pos = cur;
-      tk->len = tmp - cur;
+      tk->corrected = str;
 
-      cur = tmp + 1;
+      cur = next(tmp);
       continue;
     }
-    if (is_alpha(cur[0]) || cur[0] == '_') {
-      const char* tmp = cur + 1;
-      while (is_digit(tmp[0]) || is_alpha(tmp[0]) || tmp[0] == '_') {
-        tmp++;
+    if (is_alpha(*cur) || *cur == '_') {
+      int len = 0;
+      const char* tmp = cur;
+      while (is_digit(*tmp) || is_alpha(*tmp) || *tmp == '_') {
+        tmp = next(tmp);
+        len++;
       }
+      char *ident = malloc(len + 1);
+      copy_n(ident, cur, len);
+      ident[len] = '\0';
 
       tk = Token_new(tk);
       tk->id = ID_IDENT;
       tk->pos = cur;
-      tk->len = tmp - cur;
+      tk->corrected = ident;
 
       cur = tmp;
       continue;

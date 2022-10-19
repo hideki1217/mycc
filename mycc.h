@@ -7,7 +7,7 @@
 typedef unsigned int uint;
 typedef unsigned long ulong;
 
-// util.c 
+// util.c
 
 typedef struct Vec {
   void** buf;
@@ -34,21 +34,20 @@ bool Map_empty(Map* self);
 void Map_free(Map* self);
 
 // tokenize.c
-
 typedef struct Token {
   IDs id;
   const char* pos;
-  struct Token* next; // NULLなら終端
+  struct Token* next;  // NULLなら終端
 
   // Ident
   // Str
-  int len;
+  const char* corrected; // 通常のstring.hが適用可能
 
   // Const Integer
   long const_int;
 
   // Const Float
-  double const_float;
+  // double const_float;
 } Token;
 
-extern Token *tokenize(const char* content);
+extern Token* tokenize(const char* content);

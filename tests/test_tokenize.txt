@@ -1,9 +1,18 @@
-int main() {
+int ma\
+in() {
+// ahoaho\
+ahoaho
+/* unkounko
+ 
+ he he
+ */
     " aho b\
     cdef"
-     '\xf' '\0' '\00' '\12' 
+     '\xf' '\0' '\00' '\1\
+2' 
     '\\' int x = a * b & 6 + u / z | p % 7 >> 1 << 1
  '\t' '\000' " \n a\"    " 
  _ _a >= <=  >>= <<=  }
- == != 67 92.67 0.0 switch while for go for else extern static volatile
+ == != 67 switch while for go for e\
+lse extern static volatile
  
