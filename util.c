@@ -50,6 +50,7 @@ static char* mstrncpy(const char* src, int n) {
   }
 Vec_define(PtrV, void*);
 Vec_define(IntV, int);
+Vec_define(TokenList, Token);
 #undef Vec_define
 
 typedef struct MapNode {

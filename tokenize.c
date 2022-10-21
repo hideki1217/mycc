@@ -7,13 +7,6 @@
 #include "define.h"
 #include "mycc.h"
 
-static Token* Token_new(Token* prev) {
-  Token* x = malloc(sizeof(Token));
-  x->next = NULL;
-  prev->next = x;
-  return x;
-}
-
 static int is_space(char c) { return c == ' ' || c == '\n' || c == '\t'; }
 static int is_digit(char c) { return '0' <= c && c <= '9'; }
 static int is_alpha(char c) {
@@ -185,10 +178,9 @@ static char read_char(const char* s, const char** ls) {
   }
 }
 
-Token* tokenize(const char* name, const char* content) {
-  Token _root;
+TokenList* tokenize(const char* name, const char* content) {
+  TokenList* tks = TokenList_new();
 
-  Map macros;
   const char* cur = content;
 #define ERROR(pos_, ...)                             \
   do {                                               \
@@ -196,12 +188,12 @@ Token* tokenize(const char* name, const char* content) {
     abort();                                         \
   } while (false)
 
-  Token* tk = &_root;
+  Token* tk;
   int macro_mode = false;
   while (*cur != '\0') {
     if (macro_mode) {
       if (*cur == '\n') {
-        tk = Token_new(tk);
+        tk = TokenList_push(tks);
         tk->id = ID_PP_END;
         tk->pos = cur;
 
@@ -245,7 +237,7 @@ Token* tokenize(const char* name, const char* content) {
         char* s = malloc(n + 1);
         copy_n(s, next(cur), n), s[n] = '\0';
 
-        tk = Token_new(tk);
+        tk = TokenList_push(tks);
         tk->id = ID_PP_INCLUDE_PATH;
         tk->pos = cur;
         tk->corrected = s;
@@ -259,7 +251,7 @@ Token* tokenize(const char* name, const char* content) {
   {                                                           \
     const char* tmp;                                          \
     if (match(cur, &tmp, S_##name_, sizeof(S_##name_) - 1)) { \
-      tk = Token_new(tk);                                     \
+      tk = TokenList_push(tks);                                  \
       tk->id = ID_##name_;                                    \
       tk->pos = cur;                                          \
       cur = tmp;                                              \
@@ -311,13 +303,13 @@ Token* tokenize(const char* name, const char* content) {
     match_symbol(C1);
     match_symbol(C2);
     match_symbol(QUEST);
-    match_symbol(C); // WARNING: conflict Float 
+    match_symbol(C);  // WARNING: conflict Float
 
     match_symbol(PP_CONCAT);
     {  // PP_SYMBL
       const char* tmp;
       if (match(cur, &tmp, S_PP_SYMBL, sizeof(S_PP_SYMBL) - 1)) {
-        tk = Token_new(tk);
+        tk = TokenList_push(tks);
         tk->id = ID_PP_SYMBL;
         tk->pos = cur;
         cur = tmp;
@@ -331,7 +323,7 @@ Token* tokenize(const char* name, const char* content) {
   {                                                                  \
     const char* tmp;                                                 \
     if (match_strict(cur, &tmp, S_##name_, sizeof(S_##name_) - 1)) { \
-      tk = Token_new(tk);                                            \
+      tk = TokenList_push(tks);                                         \
       tk->id = ID_##name_;                                           \
       tk->pos = cur;                                                 \
       cur = tmp;                                                     \
@@ -379,7 +371,7 @@ Token* tokenize(const char* name, const char* content) {
       {  // PP_INCLUDE
         const char* tmp;
         if (match_strict(cur, &tmp, S_PP_INCLUDE, sizeof(S_PP_INCLUDE) - 1)) {
-          tk = Token_new(tk);
+          tk = TokenList_push(tks);
           tk->id = ID_PP_INCLUDE;
           tk->pos = cur;
           cur = tmp;
@@ -394,7 +386,7 @@ Token* tokenize(const char* name, const char* content) {
       long x = strntol(cur, &tmp, 10, 128);
       if (*tmp == '.') ERROR(cur, "Not support float");
       if (tmp != cur) {
-        tk = Token_new(tk);
+        tk = TokenList_push(tks);
         tk->id = ID_CONST_INT;
         tk->pos = cur;
         tk->const_int = x;
@@ -407,7 +399,7 @@ Token* tokenize(const char* name, const char* content) {
       // const char* tmp;
       // double x = strntod(cur, &tmp, 128);
       // if (tmp != cur) {
-      //   tk = Token_new(tk);
+      //   tk = TokenList_push(tks);
       //   tk->id = ID_CONST_FLOAT;
       //   tk->pos = cur;
       //   tk->const_float = x;
@@ -422,7 +414,7 @@ Token* tokenize(const char* name, const char* content) {
       assert(tmp != next(cur));
       if (*tmp != '\'') ERROR(tmp, "expected \'\\\'\' ");
 
-      tk = Token_new(tk);
+      tk = TokenList_push(tks);
       tk->id = ID_CHAR;
       tk->pos = cur;
       tk->const_int = c;
@@ -445,7 +437,7 @@ Token* tokenize(const char* name, const char* content) {
       char* str = malloc(len + 1);
       copy_n(str, next(cur), len), str[len] = '\0';
 
-      tk = Token_new(tk);
+      tk = TokenList_push(tks);
       tk->id = ID_STR;
       tk->pos = cur;
       tk->corrected = str;
@@ -463,7 +455,7 @@ Token* tokenize(const char* name, const char* content) {
       char* ident = malloc(len + 1);
       copy_n(ident, cur, len), ident[len] = '\0';
 
-      tk = Token_new(tk);
+      tk = TokenList_push(tks);
       tk->id = ID_IDENT;
       tk->pos = cur;
       tk->corrected = ident;
@@ -475,7 +467,7 @@ Token* tokenize(const char* name, const char* content) {
     ERROR(cur, "Internal Error: cannot tokenize");
   }
 
-  return _root.next;
+  return tks;
 }
 #undef match_symbol
 #undef match_reserved

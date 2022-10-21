@@ -23,10 +23,11 @@ int main() {
   }
 
   if (s) {
-    Token* res = tokenize(path, s);
-    Token* tmp = res;
-    while (tmp != NULL) {
-      tmp = tmp->next;
+    TokenList* res = tokenize(path, s);
+
+    Token* cur = res->buf;
+    for(int i=0; i<res->len; i++) {
+      cur++;
     }
   }
   else {

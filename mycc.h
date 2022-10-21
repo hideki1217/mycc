@@ -7,6 +7,8 @@
 typedef unsigned int uint;
 typedef unsigned long ulong;
 
+typedef struct Token Token;
+
 // util.c
 
 #define Vec_define(Self, Type)                  \
@@ -24,6 +26,7 @@ typedef unsigned long ulong;
 
 Vec_define(PtrV, void*);
 Vec_define(IntV, int);
+Vec_define(TokenList, Token);
 #undef Vec_define
 
 typedef struct Map {
@@ -56,10 +59,9 @@ void print_error(const char* name, const char* content, const char* pos,
                  char* fmt, ...);
 
 // tokenize.c
-typedef struct Token {
+struct Token {
   IDs id;
   const char* pos;
-  struct Token* next;  // NULLなら終端
 
   // Ident
   // Str
@@ -71,6 +73,6 @@ typedef struct Token {
 
   // Const Float
   // double const_float;
-} Token;
+};
 
-extern Token* tokenize(const char* name, const char* content);
+extern TokenList* tokenize(const char* name, const char* content);
