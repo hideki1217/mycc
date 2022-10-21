@@ -268,6 +268,7 @@ Token* tokenize(const char* name, const char* content) {
   }
     match_symbol(USHFT_ASGN);
     match_symbol(DSHFT_ASGN);
+    match_symbol(CCC);
 
     match_symbol(USHFT);
     match_symbol(DSHFT);
@@ -285,6 +286,7 @@ Token* tokenize(const char* name, const char* content) {
     match_symbol(OR_LESS);
     match_symbol(LGAND);
     match_symbol(LGOR);
+    match_symbol(ARROW);
 
     match_symbol(ADD);
     match_symbol(SUB);
@@ -309,6 +311,7 @@ Token* tokenize(const char* name, const char* content) {
     match_symbol(C1);
     match_symbol(C2);
     match_symbol(QUEST);
+    match_symbol(C); // WARNING: conflict Float 
 
     match_symbol(PP_CONCAT);
     {  // PP_SYMBL

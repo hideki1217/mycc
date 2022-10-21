@@ -1,3 +1,9 @@
+ahoaho->uhuhu.ahaha\
+.ihihi
+
+,...
+
+
 #  include "hogehoge.h" 
 #include <hugahuga.h> aho
 (1 - 1) ? 2: 0;

@@ -48,6 +48,9 @@
 #define S_C0 ","
 #define S_C1 ":"
 #define S_C2 ";"
+#define S_C "."
+#define S_CCC "..."
+#define S_ARROW "->"
 
 #define S_LINE_COM "//"
 #define S_BLCK_COML "/*"
@@ -152,6 +155,9 @@ typedef enum ID {
   ID_C0,
   ID_C1,
   ID_C2,
+  ID_C,
+  ID_CCC,
+  ID_ARROW,
 
   ID_IF,
   ID_ELSE,
