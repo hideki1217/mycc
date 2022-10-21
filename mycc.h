@@ -81,4 +81,4 @@ extern TokenList* tokenize(Context* context);
 
 // pp.c
 
-Token* preprocess(const char* name, const char* content, Token *input);
+TokenList* preprocess(const char* name, const char* content, Token *input);
