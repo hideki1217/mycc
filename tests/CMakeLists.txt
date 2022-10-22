@@ -6,13 +6,18 @@ target_link_libraries(test_util mycc_lib)
 target_include_directories(test_util PRIVATE ../)
 
 add_executable(test_tokenize
-    ../tokenize.c
-    ../error.c
     test_tokenize.c
 )
 target_link_libraries(test_tokenize mycc_lib)
 target_include_directories(test_tokenize PRIVATE ../)
 
+add_executable(test_pp
+    test_pp.c
+)
+target_link_libraries(test_pp mycc_lib)
+target_include_directories(test_pp PRIVATE ../)
+
 
 add_test(NAME test_util COMMAND test_util)
 add_test(NAME test_tokenize COMMAND test_tokenize)
+add_test(NAME test_pp COMMAND test_pp)
