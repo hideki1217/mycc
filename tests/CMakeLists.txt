@@ -2,9 +2,7 @@
 add_executable(test_util
     test_util.c
 )
-target_link_libraries(test_util
-    util_lib    
-)
+target_link_libraries(test_util mycc_lib)
 target_include_directories(test_util PRIVATE ../)
 
 add_executable(test_tokenize
@@ -12,9 +10,7 @@ add_executable(test_tokenize
     ../error.c
     test_tokenize.c
 )
-target_link_libraries(test_tokenize
-    util_lib    
-)
+target_link_libraries(test_tokenize mycc_lib)
 target_include_directories(test_tokenize PRIVATE ../)
 
 

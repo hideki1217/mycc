@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <assert.h>
 
-static const char* position_info(const char* content, const char* pos, int *x, int *y) {
+const char* position_info(const char* content, const char* pos, int *x, int *y) {
   /**
    * @brief get position
    * @return line top address

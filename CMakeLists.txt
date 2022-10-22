@@ -4,15 +4,17 @@ project(mycc)
 
 enable_testing()
 
-add_library(util_lib STATIC util.c)
-
-add_executable(mycc
-    main.c
+add_library(mycc_lib STATIC
     mycc.h
     define.h
     error.c
     tokenize.c
+    util.c
 )
-target_link_libraries(mycc util_lib)
+
+add_executable(mycc
+    main.c
+)
+target_link_libraries(mycc mycc_lib)
 
 add_subdirectory(tests)

@@ -178,14 +178,14 @@ static char read_char(const char* s, const char** ls) {
   }
 }
 
-TokenList* tokenize(const char* name, const char* content) {
+TokenList* tokenize(Context* context) {
   TokenList* tks = TokenList_new();
 
-  const char* cur = content;
-#define ERROR(pos_, ...)                             \
-  do {                                               \
-    print_error(name, content, (pos_), __VA_ARGS__); \
-    abort();                                         \
+  const char* cur = context->content;
+#define ERROR(pos_, ...)                                               \
+  do {                                                                 \
+    print_error(context->name, context->content, (pos_), __VA_ARGS__); \
+    abort();                                                           \
   } while (false)
 
   Token* tk;
@@ -206,6 +206,11 @@ TokenList* tokenize(const char* name, const char* content) {
       cur = next(cur);
       continue;
     }
+    if (match(cur, &cur, "!\036",
+              sizeof("!\036") -
+                  1)) {  // mysterias content, i dont know this str's mean
+      continue;
+    }
     if (match(cur, &cur, S_LINE_COM, sizeof(S_LINE_COM) - 1)) {
       const char* tmp = find_char(cur, '\n');
       if (tmp == NULL) break;  // find_char read to end
@@ -221,26 +226,26 @@ TokenList* tokenize(const char* name, const char* content) {
     }
     if (macro_mode == ID_PP_INCLUDE) {
       if (*cur == '<') {
-        int n;
-        const char *last_not_space = cur, *tmp = cur;
+        char path[MAX_IDENT + 1];
+        const char *last_not_space = cur, *tmp = next(cur);
         for (int i = 0;; i++) {
-          if (*tmp == '>') break;
-          if (*tmp == '\n') {
-            n = -1;
+          if (*tmp == '>') {
+            path[i] = '\0';
+            assert(i <= MAX_IDENT);
             break;
           }
-          if (!is_space(*tmp)) last_not_space = tmp, n = i;
-          tmp++;
+          if (*tmp == '\n') {
+            ERROR(last_not_space, "missing terminating > character");
+          }
+          if (!is_space(*tmp)) last_not_space = tmp;
+          path[i] = *tmp;
+          tmp = next(tmp);
         }
-        if (n == -1) ERROR(last_not_space, "missing terminating > character");
-
-        char* s = malloc(n + 1);
-        copy_n(s, next(cur), n), s[n] = '\0';
 
         tk = TokenList_push(tks);
         tk->id = ID_PP_INCLUDE_PATH;
         tk->pos = cur;
-        tk->corrected = s;
+        tk->corrected = Dict_push_copy(context->dict, path);
 
         cur = next(tmp);
         continue;
@@ -251,7 +256,7 @@ TokenList* tokenize(const char* name, const char* content) {
   {                                                           \
     const char* tmp;                                          \
     if (match(cur, &tmp, S_##name_, sizeof(S_##name_) - 1)) { \
-      tk = TokenList_push(tks);                                  \
+      tk = TokenList_push(tks);                               \
       tk->id = ID_##name_;                                    \
       tk->pos = cur;                                          \
       cur = tmp;                                              \
@@ -323,7 +328,7 @@ TokenList* tokenize(const char* name, const char* content) {
   {                                                                  \
     const char* tmp;                                                 \
     if (match_strict(cur, &tmp, S_##name_, sizeof(S_##name_) - 1)) { \
-      tk = TokenList_push(tks);                                         \
+      tk = TokenList_push(tks);                                      \
       tk->id = ID_##name_;                                           \
       tk->pos = cur;                                                 \
       cur = tmp;                                                     \
@@ -440,25 +445,30 @@ TokenList* tokenize(const char* name, const char* content) {
       tk = TokenList_push(tks);
       tk->id = ID_STR;
       tk->pos = cur;
-      tk->corrected = str;
+      tk->corrected = Dict_push(context->dict, str);
+      if (tk->corrected != str) {
+        free(str);
+      }
 
       cur = next(tmp);
       continue;
     }
     if (is_alpha(*cur) || *cur == '_') {
+      char ident[MAX_IDENT + 1];
       int len = 0;
       const char* tmp = cur;
       while (is_digit(*tmp) || is_alpha(*tmp) || *tmp == '_') {
+        ident[len] = *tmp;
         tmp = next(tmp);
         len++;
       }
-      char* ident = malloc(len + 1);
-      copy_n(ident, cur, len), ident[len] = '\0';
+      ident[len] = '\0';
+      assert(len <= MAX_IDENT);
 
       tk = TokenList_push(tks);
       tk->id = ID_IDENT;
       tk->pos = cur;
-      tk->corrected = ident;
+      tk->corrected = Dict_push_copy(context->dict, ident);
 
       cur = tmp;
       continue;
@@ -467,6 +477,9 @@ TokenList* tokenize(const char* name, const char* content) {
     ERROR(cur, "Internal Error: cannot tokenize");
   }
 
+  tk = TokenList_push(tks);
+  tk->id = ID_END;
+  tk->pos = cur;
   return tks;
 }
 #undef match_symbol

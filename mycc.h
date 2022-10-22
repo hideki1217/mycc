@@ -29,36 +29,37 @@ Vec_define(IntV, int);
 Vec_define(TokenList, Token);
 #undef Vec_define
 
-typedef struct Map {
-  void* root;
-  uint len;
-} Map;
-Map* Map_new();
-bool Map_push(Map* self, const char* key, int n, void* item);
-void* Map_pushf(Map* self, const char* key, int n, void* item);
-void* Map_pop(Map* self, const char* key, int n);
-void* Map_get(Map* self, const char* key, int n);
-bool Map_empty(Map* self);
-void Map_free(Map* self);
+typedef struct {
+  const char* x;
+  int lhs;
+  int rhs;
+} DictEntry;
+typedef struct Dict {
+  DictEntry*buf;
+  int buf_len;
+  int len; 
+} Dict;
+Dict* Dict_new();
+const char* Dict_push(Dict* self, const char* s);
+const char* Dict_push_copy(Dict* self, const char* s);
+bool Dict_empty(const Dict* self);
+bool Dict_contain(const Dict* self, const char* s);
+void Dict_free(Dict* self);
 
 typedef struct {
-  void* root;
-  uint len;
-} Map_;
-Map_* Map__new();
-bool Map__push(Map* self, const char* key, int n, void* item);
-void* Map__pushf(Map* self, const char* key, int n, void* item);
-void* Map__pop(Map* self, const char* key, int n);
-void* Map__get(Map* self, const char* key, int n);
-bool Map__empty(Map* self);
-void Map__free(Map* self);
+  const char* name;
+  const char* content;
+  Dict* dict;
+} Context;
 
 // error.c
 
+const char* position_info(const char* content, const char* pos, int *x, int *y);
 void print_error(const char* name, const char* content, const char* pos,
                  char* fmt, ...);
 
 // tokenize.c
+#define MAX_IDENT 128
 struct Token {
   IDs id;
   const char* pos;
@@ -66,7 +67,7 @@ struct Token {
   // Ident
   // Str
   // Include path
-  const char* corrected;  // 通常のstring.hが適用可能 所有権を持ってる
+  const char* corrected;  // 通常のstring.hが適用可能 所有権を持ってない
 
   // Const Integer
   long const_int;
@@ -74,5 +75,6 @@ struct Token {
   // Const Float
   // double const_float;
 };
+#define tkislast(tk) ((tk)->id == ID_END)
 
-extern TokenList* tokenize(const char* name, const char* content);
+extern TokenList* tokenize(Context* context);

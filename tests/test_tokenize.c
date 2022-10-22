@@ -23,12 +23,19 @@ int main() {
   }
 
   if (s) {
-    TokenList* res = tokenize(path, s);
+    Context context = {path, s, Dict_new()};
+    TokenList* res = tokenize(&context);
 
-    Token* cur = res->buf;
-    for(int i=0; i<res->len; i++) {
-      cur++;
+    for(Token* cur = res->buf; !tkislast(cur); cur++ ) {
+      if(cur->id == ID_STR || cur->id == ID_IDENT || cur->id == ID_PP_INCLUDE_PATH) {
+        // int x, y;
+        // position_info(s, cur->pos, &x, &y);
+        // printf("%s:%d:%d: ", path, y, x);
+        printf("%ld: %s\n", (long)cur->corrected, cur->corrected);
+      }
     }
+
+    Dict_free(context.dict);
   }
   else {
     printf("file is not found");

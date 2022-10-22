@@ -200,6 +200,8 @@ typedef enum ID {
   ID_CONST_CHAR,
   ID_STR,
 
+  ID_END,
+
   ID_PP_SYMBL,
   // ID_PP_TOSTR,
   ID_PP_CONCAT,

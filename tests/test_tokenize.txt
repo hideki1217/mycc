@@ -1,3 +1,5 @@
+b v a e g a b a
+
 ahoaho->uhuhu.ahaha\
 .ihihi
 
@@ -6,7 +8,7 @@ ahoaho->uhuhu.ahaha\
 
 #  include "hogehoge.h" 
 #include <hugahuga.h> aho
-(1 - 1) ? 2: 0;
+(a - b) ? c: zero;
 # ifdef HOGE
 aho
 #elif 
@@ -44,9 +46,9 @@ int main() {
     cdef"
      '\xf' '\0' '\00' '\1\
 2' 
-    '\\' int x = a * b & 6 + u / z | p % 7 >> 1 << 1
+    '\\' int x = a * b & + u / z | p % >> 1 << 1
  '\t' '\000' " \n a\"    " 
  _ _a >= <=  >>= <<=  }
  == != 67 switch while for go for e\
-lse extern static volatile
+lse extern static volatile 67
  
