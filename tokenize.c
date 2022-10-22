@@ -206,9 +206,7 @@ TokenList* tokenize(Context* context) {
       cur = next(cur);
       continue;
     }
-    if (match(cur, &cur, "!\036",
-              sizeof("!\036") -
-                  1)) {  // mysterias content, i dont know this str's mean
+    if (match(cur, &cur, "!\036", sizeof("!\036") - 1)) { // mysterias content, i dont know this str's mean
       continue;
     }
     if (match(cur, &cur, S_LINE_COM, sizeof(S_LINE_COM) - 1)) {
