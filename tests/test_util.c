@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "mycc.h"
 
@@ -93,4 +94,23 @@ int test_Dict() {
   return 0;
 }
 
-int main() { return test_Dict() || test_Vec(); }
+int test_path() {
+  const char* s = "/abs/./../../.vscode/./devcontainer.json";
+  char res[256];
+  char name[64];
+
+  assert(pathisabs(s) == true);
+  pathnorm(res, s);
+  assert(strcmp(res, "/.vscode/devcontainer.json") == 0);
+  pathname(name, s);
+  assert(strcmp(name, "devcontainer.json") == 0);
+
+  pathparen(res, s);
+  assert(strcmp(res, "/.vscode") == 0);
+
+  pathcat(res, name);
+  assert(strcmp(res, "/.vscode/devcontainer.json") == 0);
+  return 0;
+}
+
+int main() { return test_Dict() || test_Vec() || test_path(); }

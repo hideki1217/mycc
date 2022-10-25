@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 #include "mycc.h"
 
@@ -9,6 +10,25 @@ static char* mstrncpy(const char* src, int n) {
   strncpy(a, src, n);
   a[n] = '\0';
   return a;
+}
+
+const char* read_text(const char* path) {
+  char* s = 0;
+  long length;
+  FILE* f = fopen(path, "rb");
+
+  if (f) {
+    fseek(f, 0, SEEK_END);
+    length = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    s = malloc(length);
+    if (s) {
+      fread(s, 1, length, f);
+    }
+    fclose(f);
+  }
+
+  return s;
 }
 
 #define Vec_define(Self, Type)                                   \
@@ -48,8 +68,9 @@ static char* mstrncpy(const char* src, int n) {
     free(self->buf);                                             \
     free(self);                                                  \
   }
-Vec_define(PtrV, void*);
+Vec_define(Vec, void*);
 Vec_define(IntV, int);
+Vec_define(StrV, const char*);
 Vec_define(TokenList, Token);
 #undef Vec_define
 

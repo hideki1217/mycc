@@ -3,7 +3,7 @@
 "u" "n" 
 "chi";
 
-#include "test_preprocess2.txt"
+#include "test_pp2.txt"
 
 #ifdef COMP
 

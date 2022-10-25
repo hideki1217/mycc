@@ -1,19 +1,151 @@
-#include <string.h>
+#include <assert.h>
+#include <dirent.h>
 #include <stdlib.h>
+#include <string.h>
 
+#include "collection.h"
 #include "mycc.h"
 
-TokenList* expand(Context* context, Token* input) {
-  TokenList* tks = TokenList_new();
+static const char* _find_pathn(const char* base_dir, const char* path, int n) {
+  if (n <= 0) return NULL;
+  DIR* dir;
+  struct dirent* dp;
+  char target[MAX_PATH];
+  char x[MAX_PATH];
+  const char* res = NULL;
 
-  while(!tkislast(input)) {
-    Token* tk = TokenList_push(tks);
+  strcpy(target, base_dir);
+  pathcat(target, path);
+
+  dir = opendir(base_dir);
+  if (dir != NULL) {
+    for (dp = readdir(dir); dp != NULL; dp = readdir(dir)) {
+      if (strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0)
+        continue;
+      strcpy(x, base_dir);
+      pathcat(x, dp->d_name);
+      if (dp->d_type == DT_DIR) {
+        res = _find_pathn(x, path, n - 1);
+        if (res) break;
+      } else {
+        strcpy(x, base_dir);
+        pathcat(x, dp->d_name);
+        if (strcmp(target, x) == 0) {
+          res = malloc(strlen(target) + 1);
+          strcpy((char*)res, target);
+          break;
+        }
+      }
+    }
+  } else {
+    abort();
+  }
+
+  closedir(dir);
+  return res;
+}
+
+static const char* find_include_path(Context* context, const char* path,
+                                     bool local) {
+  DIR* dir;
+  struct dirent* dp;
+  const char* res = NULL;
+  char base_dir[MAX_PATH];
+  char target[MAX_PATH];
+  char x[MAX_PATH];
+
+  if (local) {
+    pathparen(base_dir, context->name);
+    res = _find_pathn(base_dir, path, 5);
+    if (res) return res;
+  }
+
+  for (int i = 0; i < context->include_path->len; i++) {
+    pathnorm(base_dir, context->include_path->buf[i]);
+    res = _find_pathn(base_dir, path, MAX_INCLUDE_DEPTH);
+    if (res) return res;
+  }
+
+  abort();
+}
+
+static bool match(const Token* input, const Token** ls, IDs id) {
+  if (input->id == id) {
+    *ls = ++input;
+    return true;
+  }
+  return false;
+}
+
+typedef struct {
+  Token* ts;
+  Token* args;
+} Macro;
+typedef struct {
+  AvlTree t;
+} Macros;
+Macros Macros_new() {
+  Macros res = {AVL_EMPTY};
+  return res;
+}
+bool Macros_push(Macros* self, int key, Macro* item) {
+  return Avl_push(&self->t, key, item);
+}
+void* Macros_pushf(Macros* self, int key, Macro* item) {
+  return Avl_pushf(&self->t, key, item);
+}
+Macro* Macros_contain(Macros self, int key) { return Avl_contain(self.t, key); }
+void Macros_free(Macros self) { Avl_free(self.t); }
+
+void _expand(Context* context, const Token* input, Macros* macros,
+             TokenList* output);
+
+void expand_include(Context* context, const Token* args, Macros* macros,
+                    TokenList* output) {
+  assert(args->id == ID_STR || args->id == ID_PP_INCLUDE_PATH);
+  assert(args[1].id == ID_PP_END);
+
+  const char* path =
+      find_include_path(context, args->corrected, (args->id == ID_STR));
+  assert(path != NULL);
+  const char* content = read_text(path);
+  assert(content != NULL);
+
+  // マクロ情報だけ継承して更に展開
+  Context ctx = {path, content, context->dict};
+  TokenList* tokenized = tokenize(&ctx);
+  _expand(&ctx, tokenized->buf, macros, output);
+
+  free((void*)content);
+  free((void*)path);
+}
+
+void _expand(Context* context, const Token* input, Macros* macros,
+             TokenList* output) {
+  while (!tkislast(input)) {
+    if (match(input, &input, ID_PP_SYMBL)) {
+      if (match(input, &input, ID_PP_INCLUDE)) {
+        expand_include(context, input, macros, output);
+        continue;
+      }
+      if (match(input, &input, ID_PP_END)) {
+        continue;
+      }
+    }
+
+    Token* tk = TokenList_push(output);
     memcpy(tk, input, sizeof(Token));
     input++;
   }
 
-  Token* tk = TokenList_push(tks);
+  Token* tk = TokenList_push(output);
   memcpy(tk, input, sizeof(Token));
+}
+
+TokenList* expand(Context* context, Token* input) {
+  TokenList* tks = TokenList_new();
+  Macros macros = Macros_new();
+  _expand(context, input, &macros, tks);
   return tks;
 }
 
@@ -28,11 +160,13 @@ TokenList* conbine_str(Context* context, Token* input) {
       }
       if (c > 1) {
         int len_sum = 0;
-        for(int i=0; i<c; i++) { len_sum += strlen(input[i].corrected); }
+        for (int i = 0; i < c; i++) {
+          len_sum += strlen(input[i].corrected);
+        }
         char* combined = malloc(len_sum + 1);
         combined[0] = '\0';
-        for(int i=0; i<c; i++) strcat(combined, input[i].corrected);
-        
+        for (int i = 0; i < c; i++) strcat(combined, input[i].corrected);
+
         Token* tk = TokenList_push(tks);
         tk->id = ID_STR;
         tk->pos = input->pos;

@@ -10,6 +10,7 @@ typedef unsigned long ulong;
 typedef struct Token Token;
 
 // util.c
+const char* read_text(const char* path);
 
 #define Vec_define(Self, Type)                  \
   typedef struct {                              \
@@ -24,8 +25,9 @@ typedef struct Token Token;
   bool Self##_empty(const Self* self);          \
   void Self##_free(Self* self);
 
-Vec_define(PtrV, void*);
+Vec_define(Vec, void*);
 Vec_define(IntV, int);
+Vec_define(StrV, const char*);
 Vec_define(TokenList, Token);
 #undef Vec_define
 
@@ -46,16 +48,28 @@ bool Dict_empty(const Dict* self);
 bool Dict_contain(const Dict* self, const char* s);
 void Dict_free(Dict* self);
 
+// path.c
+#define MAX_PATH 512
+int pathisabs(const char* path);
+char* pathnorm(char* dst, const char* path);
+char* pathname(char* dst, const char* path);
+char* pathparen(char* dst, const char* path);
+char* pathcat(char* base, const char* relative);
+
+
 typedef struct {
   const char* name;
   const char* content;
   Dict* dict;
+  StrV* include_path;
 } Context;
 
 // error.c
 
 const char* position_info(const char* content, const char* pos, int *x, int *y);
 void print_error(const char* name, const char* content, const char* pos,
+                 char* fmt, ...);
+void print_warning(const char* name, const char* content, const char* pos,
                  char* fmt, ...);
 
 // tokenize.c
@@ -80,5 +94,5 @@ struct Token {
 extern TokenList* tokenize(Context* context);
 
 // pp.c
-
+#define MAX_INCLUDE_DEPTH 6
 TokenList* preprocess(Context* context, Token *input);

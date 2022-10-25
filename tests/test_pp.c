@@ -7,23 +7,13 @@
 int main() {
   const char* path = "/home/hideki/Documents/repositories/mycc/tests/test_pp.txt";
 
-  char* s = 0;
-  long length;
-  FILE* f = fopen(path, "rb");
-
-  if (f) {
-    fseek(f, 0, SEEK_END);
-    length = ftell(f);
-    fseek(f, 0, SEEK_SET);
-    s = malloc(length);
-    if (s) {
-      fread(s, 1, length, f);
-    }
-    fclose(f);
-  }
+  const char* s = read_text(path);
 
   if (s) {
-    Context context = {path, s, Dict_new()};
+    Context context = {path, s, Dict_new(), StrV_new()};
+    {
+      *StrV_push(context.include_path) = "/usr/include";
+    }
     TokenList* tokenized = tokenize(&context);
     TokenList* pped = preprocess(&context, tokenized->buf);
 
@@ -37,6 +27,7 @@ int main() {
     }
 
     Dict_free(context.dict);
+    StrV_free(context.include_path);
   }
   else {
     printf("file is not found");
