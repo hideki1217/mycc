@@ -70,7 +70,14 @@ static const char* find_include_path(Context* context, const char* path,
 }
 
 #define POP(tks) TokenS_pop(tks)
-#define PUSH(tks, tk) TokenS_push(tks, tk)
+#define CHECK_NTH(tks_, id_, x_) \
+  (((tks_)->len < (x_)) ? false  \
+                        : ((tks_)->buf[(tks_)->len - 1 - (x_)]->id == id_))
+#define CHECK(tks_, id_) CHECK_NTH(tks_, id_, 0)
+#define CHECK2(tks_, id0_, id1_)                                     \
+  (((tks_)->len < 2) ? false                                         \
+                     : ((tks_)->buf[(tks_)->len - 1]->id == id0_) && \
+                           ((tks_)->buf[(tks_)->len - 2]->id == id1_))
 static bool match(const Token* input, const Token** ls, IDs id) {
   if (input->id == id) {
     *ls = ++input;
@@ -93,9 +100,10 @@ static TokenS* TokenS_reverse(TokenS* tks) {
 }
 
 typedef struct {
-  Token* ts;
-  Token* args;
+  TokenS* ts;
+  TokenS* args;
 } Macro;
+#define macro_is_func(macro_) ((macro_)->args != NULL)
 typedef struct {
   AvlTree t;
 } Macros;
@@ -138,52 +146,95 @@ void expand_include(Context* context, TokenS* input_r, Macros* macros,
   free(pp_end);
 }
 
+void add_macro(Context* context, Macros* macros, TokenS* input_r) {
+  assert(CHECK(input_r, ID_IDENT));
+
+  Token* name = POP(input_r);
+  TokenS* args = NULL;
+  TokenS* ts = TokenS_new();
+  if (CHECK(input_r, ID_L0)) {
+    // functional
+    free(POP(input_r));
+
+    args = TokenS_new();
+    /* ((IDENT,)*(IDENT(...)? | ...)?) */
+    while (CHECK2(input_r, ID_IDENT, ID_C0)) {
+      TokenS_push(args, POP(input_r));
+      free(POP(input_r));
+    }
+    if (CHECK2(input_r, ID_IDENT, ID_CCC)) {
+      TokenS_push(args, POP(input_r));
+      TokenS_push(args, POP(input_r));
+    } else if (CHECK(input_r, ID_IDENT)) {
+      TokenS_push(args, POP(input_r));
+    } else if (CHECK(input_r, ID_CCC)) {
+      Token* ccc = POP(input_r);
+      Token* ident = Token_new(ID_IDENT, ccc->pos);
+      ident->corrected = Dict_push(context->dict, "__VA_ARGS__");
+
+      TokenS_push(args, ident);
+      TokenS_push(args, ccc);
+    } else abort();
+
+    assert(CHECK(input_r, ID_R0));
+    free(POP(input_r));
+  }
+
+  while (!CHECK(input_r, ID_PP_END)) {
+    TokenS_push(ts, POP(input_r));
+  }
+  free(POP(input_r)); // ID_PP_END
+
+  Macro* macro = malloc(sizeof(Macro));
+  macro->args = args;
+  macro->ts = ts;
+
+  assert(Macros_push(macros, (long)name->corrected, macro));
+}
+
 void _expand(Context* context, TokenS* input_r, Macros* macros,
              TokenS* output) {
   while (!TokenS_empty(input_r)) {
-    Token* input = POP(input_r);
-    if (input->id == ID_PP_SYMBL) {
-      Token* key = POP(input_r);
-      if (key->id == ID_PP_INCLUDE) {
-        expand_include(context, input_r, macros, output);
+    if (CHECK(input_r, ID_PP_SYMBL)) {
+      free(POP(input_r));
+      if (CHECK(input_r, ID_PP_INCLUDE)) {
+        free(POP(input_r));
 
-        free(input);
-        free(key);
+        expand_include(context, input_r, macros, output);
         continue;
       }
-      if (key->id == ID_PP_DEF) {
+      if (CHECK(input_r, ID_PP_DEF)) {
+        free(POP(input_r));
+
+        add_macro(context, macros, input_r);
+        continue;
+      }
+      if (CHECK(input_r, ID_PP_IF)) {
+        free(POP(input_r));
+
         abort();
-        free(input);
-        free(key);
         continue;
       }
-      if (key->id == ID_PP_IF) {
+      if (CHECK(input_r, ID_PP_IFDEF)) {
+        free(POP(input_r));
+
         abort();
-        free(input);
-        free(key);
         continue;
       }
-      if (key->id == ID_PP_IFDEF) {
+      if (CHECK(input_r, ID_PP_IFNDEF)) {
+        free(POP(input_r));
+
         abort();
-        free(input);
-        free(key);
         continue;
       }
-      if (key->id == ID_PP_IFNDEF) {
-        abort();
-        free(input);
-        free(key);
-        continue;
-      }
-      if (key->id == ID_PP_END) {
-        free(input);
-        free(key);
+      if (CHECK(input_r, ID_PP_END)) {
+        free(POP(input_r));
         continue;
       }
       abort();
     }
 
-    TokenS_push(output, input);
+    TokenS_push(output, POP(input_r));
   }
 }
 
