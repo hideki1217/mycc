@@ -2,8 +2,8 @@
 #include <dirent.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
-#include "collection.h"
 #include "mycc.h"
 
 static const char* _find_pathn(const char* base_dir, const char* path, int n) {
@@ -69,15 +69,15 @@ static const char* find_include_path(Context* context, const char* path,
   abort();
 }
 
-#define POP(tks) TokenS_pop(tks)
+#define POP(tks) ((Token*)Vec_pop(tks))
 #define CHECK_NTH(tks_, id_, x_) \
   (((tks_)->len < (x_)) ? false  \
-                        : ((tks_)->buf[(tks_)->len - 1 - (x_)]->id == id_))
+                        : (((Token**)((tks_)->buf))[(tks_)->len - 1 - (x_)]->id == id_))
 #define CHECK(tks_, id_) CHECK_NTH(tks_, id_, 0)
 #define CHECK2(tks_, id0_, id1_)                                     \
   (((tks_)->len < 2) ? false                                         \
-                     : ((tks_)->buf[(tks_)->len - 1]->id == id0_) && \
-                           ((tks_)->buf[(tks_)->len - 2]->id == id1_))
+                     : (((Token**)((tks_)->buf))[(tks_)->len - 1]->id == id0_) && \
+                           (((Token**)((tks_)->buf))[(tks_)->len - 2]->id == id1_))
 static bool match(const Token* input, const Token** ls, IDs id) {
   if (input->id == id) {
     *ls = ++input;
@@ -94,36 +94,36 @@ static void reverse(void** buf, int n) {
   }
 }
 
-static TokenS* TokenS_reverse(TokenS* tks) {
+static Vec* Vec_reverse(Vec* tks) {
   reverse((void**)tks->buf, tks->len);
   return tks;
 }
 
 typedef struct {
-  TokenS* ts;
-  TokenS* args;
+  Vec* ts;
+  Vec* args;
 } Macro;
 #define macro_is_func(macro_) ((macro_)->args != NULL)
 typedef struct {
-  AvlTree t;
+  Map t;
 } Macros;
 Macros Macros_new() {
-  Macros res = {AVL_EMPTY};
+  Macros res = {Map_new()};
   return res;
 }
 bool Macros_push(Macros* self, int key, Macro* item) {
-  return Avl_push(&self->t, key, item);
+  return Map_push(&self->t, key, item);
 }
-void* Macros_pushf(Macros* self, int key, Macro* item) {
-  return Avl_pushf(&self->t, key, item);
+Macro* Macros_pushf(Macros* self, int key, Macro* item) {
+  return Map_pushf(&self->t, key, item);
 }
-Macro* Macros_contain(Macros self, int key) { return Avl_contain(self.t, key); }
-void Macros_free(Macros self) { Avl_free(self.t); }
+Macro* Macros_contain(Macros self, int key) { return Map_contain(self.t, key); }
+void Macros_free(Macros self) { Map_free(self.t); }
 
-void _expand(Context* context, TokenS* input_r, Macros* macros, TokenS* output);
+void _expand(Context* context, Vec* input_r, Macros* macros, Vec* output);
 
-void expand_include(Context* context, TokenS* input_r, Macros* macros,
-                    TokenS* output) {
+void expand_include(Context* context, Vec* input_r, Macros* macros,
+                    Vec* output) {
   Token* arg = POP(input_r);
   assert(arg->id == ID_STR || arg->id == ID_PP_INCLUDE_PATH);
   Token* pp_end = POP(input_r);
@@ -136,9 +136,14 @@ void expand_include(Context* context, TokenS* input_r, Macros* macros,
   assert(content != NULL);
 
   // マクロ情報だけ継承して更に展開
-  Context ctx = {path, content, context->dict};
-  TokenS* tokenized = tokenize(&ctx);
-  _expand(&ctx, TokenS_reverse(tokenized), macros, output);
+  Context ctx = {path, content, context->dict, context->include_path};
+  Vec* tokenized = tokenize(&ctx);
+  
+  Token* eof = POP(tokenized);
+  assert(eof->id == ID_EOF);
+  free(eof);
+  
+  _expand(&ctx, Vec_reverse(tokenized), macros, output);
 
   free((void*)content);
   free((void*)path);
@@ -146,44 +151,45 @@ void expand_include(Context* context, TokenS* input_r, Macros* macros,
   free(pp_end);
 }
 
-void add_macro(Context* context, Macros* macros, TokenS* input_r) {
+void add_macro(Context* context, Macros* macros, Vec* input_r) {
   assert(CHECK(input_r, ID_IDENT));
 
   Token* name = POP(input_r);
-  TokenS* args = NULL;
-  TokenS* ts = TokenS_new();
+  Vec* args = NULL;
+  Vec* ts = Vec_new();
   if (CHECK(input_r, ID_L0)) {
     // functional
     free(POP(input_r));
 
-    args = TokenS_new();
+    args = Vec_new();
     /* ((IDENT,)*(IDENT(...)? | ...)?) */
     while (CHECK2(input_r, ID_IDENT, ID_C0)) {
-      TokenS_push(args, POP(input_r));
+      Vec_push(args, POP(input_r));
       free(POP(input_r));
     }
     if (CHECK2(input_r, ID_IDENT, ID_CCC)) {
-      TokenS_push(args, POP(input_r));
-      TokenS_push(args, POP(input_r));
+      Vec_push(args, POP(input_r));
+      Vec_push(args, POP(input_r));
     } else if (CHECK(input_r, ID_IDENT)) {
-      TokenS_push(args, POP(input_r));
+      Vec_push(args, POP(input_r));
     } else if (CHECK(input_r, ID_CCC)) {
       Token* ccc = POP(input_r);
       Token* ident = Token_new(ID_IDENT, ccc->pos);
-      ident->corrected = Dict_push(context->dict, "__VA_ARGS__");
+      ident->corrected = Dict_push(&context->dict, "__VA_ARGS__");
 
-      TokenS_push(args, ident);
-      TokenS_push(args, ccc);
-    } else abort();
+      Vec_push(args, ident);
+      Vec_push(args, ccc);
+    } else
+      abort();
 
     assert(CHECK(input_r, ID_R0));
     free(POP(input_r));
   }
 
   while (!CHECK(input_r, ID_PP_END)) {
-    TokenS_push(ts, POP(input_r));
+    Vec_push(ts, POP(input_r));
   }
-  free(POP(input_r)); // ID_PP_END
+  free(POP(input_r));  // ID_PP_END
 
   Macro* macro = malloc(sizeof(Macro));
   macro->args = args;
@@ -192,11 +198,91 @@ void add_macro(Context* context, Macros* macros, TokenS* input_r) {
   assert(Macros_push(macros, (long)name->corrected, macro));
 }
 
-void _expand(Context* context, TokenS* input_r, Macros* macros,
-             TokenS* output) {
-  while (!TokenS_empty(input_r)) {
+void jump_to_else_elif_endif(Vec* input_r) {
+  int if_count = 0;
+  while (!Vec_empty(input_r)) {
+    if (CHECK(input_r, ID_PP_IF) || CHECK(input_r, ID_PP_IFDEF) ||
+        CHECK(input_r, ID_PP_IFNDEF)) {
+      if_count++;
+    }
+    if (CHECK(input_r, ID_PP_ENDIF) && if_count != 0) if_count--;
+    if (CHECK(input_r, ID_PP_ENDIF) || CHECK(input_r, ID_PP_ELSE) ||
+        CHECK(input_r, ID_PP_ELIF)) {
+      if (if_count == 0) {
+        break;
+      }
+    }
+    assert(if_count >= 0);
+    free(POP(input_r));
+  }
+  assert(CHECK(input_r, ID_PP_ENDIF) || CHECK(input_r, ID_PP_ELSE) ||
+         CHECK(input_r, ID_PP_ELIF));
+}
+
+void jump_to_endif(Vec* input_r) {
+  int if_count = 0;
+  while (!Vec_empty(input_r)) {
+    if (CHECK(input_r, ID_PP_IF) || CHECK(input_r, ID_PP_IFDEF) ||
+        CHECK(input_r, ID_PP_IFNDEF)) {
+      if_count++;
+    }
+    if (CHECK(input_r, ID_PP_ENDIF)){
+      if (if_count != 0) if_count--;
+      else break;
+    } 
+    assert(if_count >= 0);
+    free(POP(input_r));
+  }
+  assert(CHECK(input_r, ID_PP_ENDIF));
+}
+
+int eval_if(Macros* macros, Vec* input_r) {
+  abort();
+  return 1;
+}
+
+int if_jump(Macros* macros, Vec* input_r, bool cond) {
+  if (cond) {
+    return 1;
+  } else {
+    while (true) {
+      jump_to_else_elif_endif(input_r);
+      Token* key = POP(input_r);
+      if (key->id == ID_PP_ELSE) {
+        free(key);
+        assert(CHECK(input_r, ID_PP_END));
+        free(POP(input_r));
+
+        return 1;
+      }
+      if (key->id == ID_PP_ENDIF) {
+        free(key);
+        assert(CHECK(input_r, ID_PP_END));
+        free(POP(input_r));
+
+        return 0;
+      }
+      if (key->id == ID_PP_ELIF) {
+        free(key);
+        bool cond = eval_if(macros, input_r);
+        assert(CHECK(input_r, ID_PP_END));
+        free(POP(input_r));
+
+        if (cond) {
+          return 1;
+        }
+      }
+    }
+  }
+}
+
+void _expand(Context* context, Vec* input_r, Macros* macros,
+             Vec* output) {
+  int if_count = 0;
+  while (!Vec_empty(input_r)) {
     if (CHECK(input_r, ID_PP_SYMBL)) {
       free(POP(input_r));
+
       if (CHECK(input_r, ID_PP_INCLUDE)) {
         free(POP(input_r));
 
@@ -212,19 +298,71 @@ void _expand(Context* context, TokenS* input_r, Macros* macros,
       if (CHECK(input_r, ID_PP_IF)) {
         free(POP(input_r));
 
-        abort();
+        bool cond = eval_if(macros, input_r);
+        assert(CHECK(input_r, ID_PP_END));
+        free(POP(input_r));  // ID_PP_END
+
+        if_count += if_jump(macros, input_r, cond);
         continue;
       }
       if (CHECK(input_r, ID_PP_IFDEF)) {
         free(POP(input_r));
 
-        abort();
+        assert(CHECK(input_r, ID_IDENT));
+        Token* ident = POP(input_r);
+        bool cond = Macros_contain(*macros, (long)ident->corrected) != NULL;
+
+        free(ident);
+        assert(CHECK(input_r, ID_PP_END));
+        free(POP(input_r));  // ID_PP_END
+
+        if_count += if_jump(macros, input_r, cond);
         continue;
       }
       if (CHECK(input_r, ID_PP_IFNDEF)) {
         free(POP(input_r));
 
-        abort();
+        assert(CHECK(input_r, ID_IDENT));
+        Token* ident = POP(input_r);
+        bool cond = Macros_contain(*macros, (long)ident->corrected) == NULL;
+
+        free(ident);
+        assert(CHECK(input_r, ID_PP_END));
+        free(POP(input_r));  // ID_PP_END
+
+        if_count += if_jump(macros, input_r, cond);
+        continue;
+      }
+      if (CHECK(input_r, ID_PP_ELSE) || CHECK(input_r, ID_PP_ELIF)) {
+        free(POP(input_r));
+
+        assert(if_count > 0);
+        if_count--;
+
+        jump_to_endif(input_r);
+        assert(CHECK(input_r, ID_PP_ENDIF));
+        free(POP(input_r));
+        assert(CHECK(input_r, ID_PP_END));
+        free(POP(input_r));
+
+        continue;
+      }
+      if (CHECK(input_r, ID_PP_ENDIF)) {
+        free(POP(input_r));
+
+        assert(if_count > 0);
+        if_count--;
+
+        assert(CHECK(input_r, ID_PP_END));
+        free(POP(input_r));
+
+        continue;
+      }
+      if (CHECK(input_r, ID_PP_PRAGMA)) {
+        free(POP(input_r));
+        // todo: 今はすべて無視
+        while(!CHECK(input_r, ID_PP_END)) free(POP(input_r));
+        free(POP(input_r));
         continue;
       }
       if (CHECK(input_r, ID_PP_END)) {
@@ -234,28 +372,29 @@ void _expand(Context* context, TokenS* input_r, Macros* macros,
       abort();
     }
 
-    TokenS_push(output, POP(input_r));
+    Vec_push(output, POP(input_r));
   }
+  assert(if_count == 0);
 }
 
-TokenS* expand(Context* context, TokenS* inputs) {
-  TokenS* outputs = TokenS_new();
+Vec* expand(Context* context, Vec* inputs) {
+  Vec* outputs = Vec_new();
   Macros macros = Macros_new();
 
-  _expand(context, TokenS_reverse(inputs), &macros, outputs);
+  _expand(context, Vec_reverse(inputs), &macros, outputs);
 
   return outputs;
 }
 
-TokenS* conbine_str(Context* context, TokenS* inputs) {
-  TokenS* outputs = TokenS_new();
-  TokenS_push(inputs, NULL);  // iterator の終了判定
+Vec* conbine_str(Context* context, Vec* inputs) {
+  Vec* outputs = Vec_new();
+  Vec_push(inputs, NULL);  // iterator の終了判定
 
-  Token** input = inputs->buf;
+  Token** input = (Token**)inputs->buf;
   while (*input != NULL) {
     if ((*input)->id == ID_STR) {
       int c = 0;
-      for (Token* tmp = (*input); tmp->id == ID_STR; tmp++) {
+      for (Token** tmp = input; (*tmp)->id == ID_STR; tmp++) {
         c++;
       }
       if (c > 1) {
@@ -267,20 +406,22 @@ TokenS* conbine_str(Context* context, TokenS* inputs) {
         combined[0] = '\0';
         for (int i = 0; i < c; i++) strcat(combined, input[i]->corrected);
 
-        Token* tk = TokenS_push(outputs, Token_new(ID_STR, (*input)->pos));
-        tk->corrected = Dict_push(context->dict, combined);
+        Token* tk = Vec_push(outputs, Token_new(ID_STR, (*input)->pos));
+        tk->corrected = Dict_push(&context->dict, combined);
+
+        for(int i=0; i<c; i++) free(input[i]);
 
         input = input + c;
         continue;
       }
     }
-    Token* tk = TokenS_push(outputs, *input);
+    Token* tk = Vec_push(outputs, *input);
     input++;
   }
   return outputs;
 }
 
-TokenS* preprocess(Context* context, TokenS* input) {
+Vec* preprocess(Context* context, Vec* input) {
   //前から読んでいきながら、Macroデータベースを更新
   // includeを見つけたら展開し、展開後のはじめからスタート
   // ifdef, ifndef
@@ -297,7 +438,7 @@ TokenS* preprocess(Context* context, TokenS* input) {
   // IDENT　のときは値マクロなので、値マクロ登録の処理
   //データベースにある識別子を見つけた^呼び出し可能になっている(正当な引数がついている)ならば
   //マクロ展開
-  TokenS* expanded = expand(context, input);
-  TokenS* combined = conbine_str(context, expanded);
+  Vec* expanded = expand(context, input);
+  Vec* combined = conbine_str(context, expanded);
   return combined;
 }

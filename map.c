@@ -1,32 +1,32 @@
-// https://www.cs.yale.edu/homes/aspnes/pinewiki/C(2f)AvlTree.html
+// https://www.cs.yale.edu/homes/aspnes/pinewiki/C(2f)Map.html
 
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "collection.h"
+#include "mycc.h"
 
 /* implementation of an AVL tree with explicit heights */
 
-struct avlNode {
-  struct avlNode *child[2]; /* left and right */
-  int key;
+struct mapNode {
+  struct mapNode *child[2]; /* left and right */
+  long key;
   int height;
   void *item;
 };
 
 /* free a tree */
-void Avl_free(AvlTree t) {
-  if (t != AVL_EMPTY) {
-    Avl_free(t->child[0]);
-    Avl_free(t->child[1]);
+void Map_free(Map t) {
+  if (t != MAP_EMPTY) {
+    Map_free(t->child[0]);
+    Map_free(t->child[1]);
     free(t);
   }
 }
 
 /* return height of an AVL tree */
-int Avl_height(AvlTree t) {
-  if (t != AVL_EMPTY) {
+static int Map_height(Map t) {
+  if (t != MAP_EMPTY) {
     return t->height;
   } else {
     return 0;
@@ -34,37 +34,37 @@ int Avl_height(AvlTree t) {
 }
 
 /* return nonzero if key is present in tree */
-void *Avl_contain(AvlTree t, int key) {
-  if (t == AVL_EMPTY) {
+void *Map_contain(Map t, long key) {
+  if (t == MAP_EMPTY) {
     return NULL;
   } else if (t->key == key) {
     return t->item;
   } else {
-    return Avl_contain(t->child[key > t->key], key);
+    return Map_contain(t->child[key > t->key], key);
   }
 }
 
 #define Max(x, y) ((x) > (y) ? (x) : (y))
 
 /* assert height fields are correct throughout tree */
-void Avl_sanitycheck(AvlTree root) {
+static void Map_sanitycheck(Map root) {
   int i;
 
-  if (root != AVL_EMPTY) {
+  if (root != MAP_EMPTY) {
     for (i = 0; i < 2; i++) {
-      Avl_sanitycheck(root->child[i]);
+      Map_sanitycheck(root->child[i]);
     }
 
     assert(root->height ==
-           1 + Max(Avl_height(root->child[0]), Avl_height(root->child[1])));
+           1 + Max(Map_height(root->child[0]), Map_height(root->child[1])));
   }
 }
 
 /* recompute height of a node */
-static void Avl_fix_height(AvlTree t) {
-  assert(t != AVL_EMPTY);
+static void Map_fix_height(Map t) {
+  assert(t != MAP_EMPTY);
 
-  t->height = 1 + Max(Avl_height(t->child[0]), Avl_height(t->child[1]));
+  t->height = 1 + Max(Map_height(t->child[0]), Map_height(t->child[1]));
 }
 
 /* rotate child[d] to root */
@@ -78,10 +78,10 @@ static void Avl_fix_height(AvlTree t) {
  * A   B            B   C
  *
  */
-static void Avl_rotate(AvlTree *root, int d) {
-  AvlTree oldRoot;
-  AvlTree newRoot;
-  AvlTree oldMiddle;
+static void Map_rotate(Map *root, int d) {
+  Map oldRoot;
+  Map newRoot;
+  Map oldMiddle;
 
   oldRoot = *root;
   newRoot = oldRoot->child[d];
@@ -92,53 +92,53 @@ static void Avl_rotate(AvlTree *root, int d) {
   *root = newRoot;
 
   /* update heights */
-  Avl_fix_height((*root)->child[!d]); /* old root */
-  Avl_fix_height(*root);              /* new root */
+  Map_fix_height((*root)->child[!d]); /* old root */
+  Map_fix_height(*root);              /* new root */
 }
 
 /* rebalance at node if necessary */
 /* also fixes height */
-static void Avl_rebalance(AvlTree *t) {
+static void Map_rebalance(Map *t) {
   int d;
 
-  if (*t != AVL_EMPTY) {
+  if (*t != MAP_EMPTY) {
     for (d = 0; d < 2; d++) {
       /* maybe child[d] is now too tall */
-      if (Avl_height((*t)->child[d]) > Avl_height((*t)->child[!d]) + 1) {
+      if (Map_height((*t)->child[d]) > Map_height((*t)->child[!d]) + 1) {
         /* imbalanced! */
         /* how to fix it? */
         /* need to look for taller grandchild of child[d] */
-        if (Avl_height((*t)->child[d]->child[d]) >
-            Avl_height((*t)->child[d]->child[!d])) {
+        if (Map_height((*t)->child[d]->child[d]) >
+            Map_height((*t)->child[d]->child[!d])) {
           /* same direction grandchild wins, do single rotation */
-          Avl_rotate(t, d);
+          Map_rotate(t, d);
         } else {
           /* opposite direction grandchild moves up, do double rotation */
-          Avl_rotate(&(*t)->child[d], !d);
-          Avl_rotate(t, d);
+          Map_rotate(&(*t)->child[d], !d);
+          Map_rotate(t, d);
         }
 
-        return; /* Avl_rotate called Avl_fix_height */
+        return; /* Map_rotate called Map_fix_height */
       }
     }
 
     /* update height */
-    Avl_fix_height(*t);
+    Map_fix_height(*t);
   }
 }
 
 /* insert into tree */
 /* this may replace root, which is why we pass
- * in a AvlTree * */
-int Avl_push(AvlTree *t, int key, void *item) {
+ * in a Map * */
+int Map_push(Map *t, long key, void *item) {
   /* insertion procedure */
-  if (*t == AVL_EMPTY) {
+  if (*t == MAP_EMPTY) {
     /* new t */
-    *t = malloc(sizeof(struct avlNode));
+    *t = malloc(sizeof(struct mapNode));
     assert(*t);
 
-    (*t)->child[0] = AVL_EMPTY;
-    (*t)->child[1] = AVL_EMPTY;
+    (*t)->child[0] = MAP_EMPTY;
+    (*t)->child[1] = MAP_EMPTY;
 
     (*t)->key = key;
     (*t)->item = item;
@@ -152,22 +152,22 @@ int Avl_push(AvlTree *t, int key, void *item) {
     return 0;
   } else {
     /* do the insert in subtree */
-    int res = Avl_push(&(*t)->child[key > (*t)->key], key, item);
+    int res = Map_push(&(*t)->child[key > (*t)->key], key, item);
 
-    Avl_rebalance(t);
+    Map_rebalance(t);
 
     return res;
   }
 }
-void *Avl_pushf(AvlTree *t, int key, void *item) {
+void *Map_pushf(Map *t, long key, void *item) {
   /* insertion procedure */
-  if (*t == AVL_EMPTY) {
+  if (*t == MAP_EMPTY) {
     /* new t */
-    *t = malloc(sizeof(struct avlNode));
+    *t = malloc(sizeof(struct mapNode));
     assert(*t);
 
-    (*t)->child[0] = AVL_EMPTY;
-    (*t)->child[1] = AVL_EMPTY;
+    (*t)->child[0] = MAP_EMPTY;
+    (*t)->child[1] = MAP_EMPTY;
 
     (*t)->key = key;
     (*t)->item = item;
@@ -183,29 +183,29 @@ void *Avl_pushf(AvlTree *t, int key, void *item) {
     return item;
   } else {
     /* do the insert in subtree */
-    void *res = Avl_pushf(&(*t)->child[key > (*t)->key], key, item);
-    Avl_rebalance(t);
+    void *res = Map_pushf(&(*t)->child[key > (*t)->key], key, item);
+    Map_rebalance(t);
     return res;
   }
 }
 
 /* print all elements of the tree in order */
-void Avl_print_keys(AvlTree t) {
-  if (t != AVL_EMPTY) {
-    Avl_print_keys(t->child[0]);
-    printf("%d\n", t->key);
-    Avl_print_keys(t->child[1]);
+void Map_print_keys(Map t) {
+  if (t != MAP_EMPTY) {
+    Map_print_keys(t->child[0]);
+    printf("%ld\n", t->key);
+    Map_print_keys(t->child[1]);
   }
 }
 
 /* delete and return minimum value in a tree */
-static int Avl_delete_min(AvlTree *t, void **item) {
-  AvlTree oldroot;
+static int Map_delete_min(Map *t, void **item) {
+  Map oldroot;
   int minValue;
 
-  assert(t != AVL_EMPTY);
+  assert(t != MAP_EMPTY);
 
-  if ((*t)->child[0] == AVL_EMPTY) {
+  if ((*t)->child[0] == MAP_EMPTY) {
     /* root is min value */
     oldroot = *t;
     minValue = oldroot->key;
@@ -214,25 +214,25 @@ static int Avl_delete_min(AvlTree *t, void **item) {
     free(oldroot);
   } else {
     /* min value is in left subtree */
-    minValue = Avl_delete_min(&(*t)->child[0], item);
+    minValue = Map_delete_min(&(*t)->child[0], item);
   }
 
-  Avl_rebalance(t);
+  Map_rebalance(t);
   return minValue;
 }
 
 /* delete the given value */
-void *Avl_delete(AvlTree *t, int key) {
-  AvlTree oldroot;
+void *Map_delete(Map *t, long key) {
+  Map oldroot;
 
-  if (*t != AVL_EMPTY) {
+  if (*t != MAP_EMPTY) {
     return NULL;
   } else if ((*t)->key == key) {
     void *item = (*t)->item;
     /* do we have a right child? */
-    if ((*t)->child[1] != AVL_EMPTY) {
+    if ((*t)->child[1] != MAP_EMPTY) {
       /* give root min value in right subtree */
-      (*t)->key = Avl_delete_min(&(*t)->child[1], &(*t)->item);
+      (*t)->key = Map_delete_min(&(*t)->child[1], &(*t)->item);
     } else {
       /* splice out root */
       oldroot = (*t);
@@ -241,9 +241,9 @@ void *Avl_delete(AvlTree *t, int key) {
     }
     return item;
   } else {
-    return Avl_delete(&(*t)->child[key > (*t)->key], key);
+    return Map_delete(&(*t)->child[key > (*t)->key], key);
   }
 
   /* rebalance */
-  Avl_rebalance(t);
+  Map_rebalance(t);
 }

@@ -4,32 +4,6 @@
 
 #include "mycc.h"
 
-int test_Vec() {
-  int a[256];
-  for (int i = 0; i < 256; i++) a[i] = i;
-  IntV* int_v = IntV_new();
-
-  assert(IntV_empty(int_v) == true);
-
-  for (int i = 0; i < 256; i++) {
-    int* ref = IntV_push(int_v);
-    *ref = a[i];
-  }
-
-  assert(IntV_empty(int_v) == false);
-  assert(*IntV_get(int_v, 0) == 0);
-  assert(*IntV_get(int_v, 2) == 2);
-  assert(*IntV_get(int_v, 17) == 17);
-
-  IntV_pop(int_v);
-  IntV_pop(int_v);
-
-  // assert(Vec_get(vec, 255) == NULL); // abort
-
-  IntV_free(int_v);
-  return 0;
-}
-
 // int test_Map() {
 //   int a[5];
 //   for (int i = 0; i < 5; i++) a[i] = i;
@@ -63,7 +37,7 @@ int test_Vec() {
 // }
 
 int test_Dict() {
-  Dict* dict = Dict_new();
+  Dict dict = Dict_new();
 
   assert(Dict_empty(dict) == true);
 
@@ -71,7 +45,7 @@ int test_Dict() {
     char* x = malloc(11);
     for (int i = 0; i < 10; i++) x[i] = 'a' + j;
     x[10] = '\0';
-    Dict_push(dict, x);
+    Dict_push(&dict, x);
   }
 
   assert(Dict_empty(dict) == false);
@@ -80,13 +54,13 @@ int test_Dict() {
   
   for (int i = 0; i < 10; i++) x[i] = 'a';
   x[10] = '\0';
-  assert(Dict_contain(dict, x) == true);
+  assert(Dict_contain(dict, x) != NULL);
   
   x[2] = 'b';
-  assert(Dict_contain(dict, x) == false);
+  assert(Dict_contain(dict, x) == NULL);
 
   x[2] = 'a';
-  const char* res = Dict_push(dict, x);
+  const char* res = Dict_push(&dict, x);
   for(int i=0; i<10; i++) assert(res[i] == 'a');
 
   Dict_free(dict);
@@ -113,4 +87,4 @@ int test_path() {
   return 0;
 }
 
-int main() { return test_Dict() || test_Vec() || test_path(); }
+int main() { return test_Dict() || test_path(); }

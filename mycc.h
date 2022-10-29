@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stddef.h>
 
 #include "define.h"
 
@@ -12,56 +13,38 @@ typedef struct Token Token;
 // util.c
 const char* read_text(const char* path);
 
-#define Vec_define(Self, Type)                  \
-  typedef struct {                              \
-    Type* buf;                                  \
-    uint buf_l;                                 \
-    uint len;                                   \
-  } Self;                                       \
-  Self* Self##_new();                           \
-  Self* Self##_withsize(int size);              \
-  Type* Self##_push(Self* self);                \
-  bool Self##_pop(Self* self);                  \
-  Type* Self##_get(const Self* self, uint idx); \
-  bool Self##_empty(const Self* self);          \
-  void Self##_clear(Self* self);                \
-  void Self##_free(Self* self);
-
-Vec_define(Vec, void*);
-Vec_define(IntV, int);
-Vec_define(StrV, const char*);
-#undef Vec_define
-
 typedef struct {
-  Token** buf;
+  void** buf;
   long buf_len;
   long len;
-} TokenS;
-TokenS* TokenS_new();
-TokenS* TokenS_withsize(int size);
-Token* TokenS_push(TokenS* self, Token* tk);
-Token* TokenS_pop(TokenS* self);
-Token* TokenS_get(TokenS* self, int idx);
-TokenS* TokenS_clear(TokenS* self);
-bool TokenS_empty(const TokenS* self);
-void TokenS_free(TokenS* self);
+} Vec;
+Vec* Vec_new();
+Vec* Vec_withsize(int size);
+void* Vec_push(Vec* self, void* x);
+void* Vec_pop(Vec* self);
+void* Vec_get(Vec* self, int idx);
+Vec* Vec_clear(Vec* self);
+bool Vec_empty(const Vec* self);
+void Vec_free(Vec* self);
 
-typedef struct {
-  const char* x;
-  int lhs;
-  int rhs;
-} DictEntry;
-typedef struct Dict {
-  DictEntry* buf;
-  int buf_len;
-  int len;
-} Dict;
-Dict* Dict_new();
+typedef struct DictNode *Dict;
+#define DICT_EMPTY NULL
+#define Dict_new() DICT_EMPTY
 const char* Dict_push(Dict* self, const char* s);
 const char* Dict_push_copy(Dict* self, const char* s);
-bool Dict_empty(const Dict* self);
-bool Dict_contain(const Dict* self, const char* s);
-void Dict_free(Dict* self);
+#define Dict_empty(self) ((self) == DICT_EMPTY)
+const char *Dict_contain(Dict self, const char* s);
+void Dict_free(Dict t);
+
+typedef struct mapNode *Map;
+#define MAP_EMPTY NULL
+#define Map_new() MAP_EMPTY
+void Map_free(Map t);
+void *Map_contain(Map t, long key);
+int Map_push(Map *t, long key, void *item);
+void *Map_pushf(Map *t, long key, void *item);
+void Map_print_keys(Map t);
+void *Map_delete(Map *t, long key);
 
 // path.c
 #define MAX_PATH 512
@@ -74,8 +57,8 @@ char* pathcat(char* base, const char* relative);
 typedef struct {
   const char* name;
   const char* content;
-  Dict* dict;
-  StrV* include_path;
+  Dict dict;
+  Vec* include_path;
 } Context;
 
 // error.c
@@ -106,8 +89,8 @@ struct Token {
 #define tk_eof(tk) ((tk)->id == ID_EOF)
 Token* Token_new(IDs id, const char* pos);
 
-extern TokenS* tokenize(Context* context);
+extern Vec* tokenize(Context* context);
 
 // pp.c
 #define MAX_INCLUDE_DEPTH 6
-TokenS* preprocess(Context* context, TokenS* input);
+Vec* preprocess(Context* context, Vec* input);

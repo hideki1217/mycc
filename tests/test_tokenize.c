@@ -12,15 +12,16 @@ int main() {
 
   if (s) {
     Context context = {path, s, Dict_new()};
-    TokenS* res = tokenize(&context);
+    Vec* res = tokenize(&context);
 
-    for (Token** cur = res->buf; !tk_eof(*cur); cur++) {
-      if ((*cur)->id == ID_STR || (*cur)->id == ID_IDENT ||
-          (*cur)->id == ID_PP_INCLUDE_PATH) {
+    for (int i=0; i>res->len; i++) {
+      Token* cur = res->buf[i];
+      if (cur->id == ID_STR || cur->id == ID_IDENT ||
+          cur->id == ID_PP_INCLUDE_PATH) {
         // int x, y;
         // position_info(s, cur->pos, &x, &y);
         // printf("%s:%d:%d: ", path, y, x);
-        printf("%ld: %s\n", (long)(*cur)->corrected, (*cur)->corrected);
+        printf("%ld: %s\n", (long)cur->corrected, cur->corrected);
       }
     }
 
