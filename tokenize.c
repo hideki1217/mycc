@@ -178,8 +178,17 @@ static char read_char(const char* s, const char** ls) {
   }
 }
 
-TokenList* tokenize(Context* context) {
-  TokenList* tks = TokenList_new();
+Token* Token_new(IDs id, const char* pos) {
+  assert(pos != NULL);
+  Token* res = malloc(sizeof(Token));
+  res->id = id;
+  res->pos = pos;
+  res->corrected = NULL;
+  return res;
+}
+
+TokenS* tokenize(Context* context) {
+  TokenS* tks = TokenS_new();
 
   const char* cur = context->content;
 #define ERROR(pos_, ...)                                               \
@@ -193,9 +202,7 @@ TokenList* tokenize(Context* context) {
   while (*cur != '\0') {
     if (macro_mode) {
       if (*cur == '\n') {
-        tk = TokenList_push(tks);
-        tk->id = ID_PP_END;
-        tk->pos = cur;
+        tk = TokenS_push(tks, Token_new(ID_PP_END, cur));
 
         cur = next(cur);
         macro_mode = false;
@@ -206,7 +213,9 @@ TokenList* tokenize(Context* context) {
       cur = next(cur);
       continue;
     }
-    if (match(cur, &cur, "!\036", sizeof("!\036") - 1)) { // mysterias content, i dont know this str's mean
+    if (match(cur, &cur, "!\036",
+              sizeof("!\036") -
+                  1)) {  // mysterias content, i dont know this str's mean
       continue;
     }
     if (match(cur, &cur, S_LINE_COM, sizeof(S_LINE_COM) - 1)) {
@@ -240,9 +249,7 @@ TokenList* tokenize(Context* context) {
           tmp = next(tmp);
         }
 
-        tk = TokenList_push(tks);
-        tk->id = ID_PP_INCLUDE_PATH;
-        tk->pos = cur;
+        tk = TokenS_push(tks, Token_new(ID_PP_INCLUDE_PATH, cur));
         tk->corrected = Dict_push_copy(context->dict, path);
 
         cur = next(tmp);
@@ -254,9 +261,7 @@ TokenList* tokenize(Context* context) {
   {                                                           \
     const char* tmp;                                          \
     if (match(cur, &tmp, S_##name_, sizeof(S_##name_) - 1)) { \
-      tk = TokenList_push(tks);                               \
-      tk->id = ID_##name_;                                    \
-      tk->pos = cur;                                          \
+      tk = TokenS_push(tks, Token_new(ID_##name_, cur));      \
       cur = tmp;                                              \
       continue;                                               \
     }                                                         \
@@ -309,26 +314,11 @@ TokenList* tokenize(Context* context) {
     match_symbol(C);  // WARNING: conflict Float
 
     match_symbol(PP_CONCAT);
-    {  // PP_SYMBL
-      const char* tmp;
-      if (match(cur, &tmp, S_PP_SYMBL, sizeof(S_PP_SYMBL) - 1)) {
-        tk = TokenList_push(tks);
-        tk->id = ID_PP_SYMBL;
-        tk->pos = cur;
-        cur = tmp;
-        if (!macro_mode) {
-          macro_mode = true;
-        }
-        continue;
-      }
-    }
 #define match_reserved(name_)                                        \
   {                                                                  \
     const char* tmp;                                                 \
     if (match_strict(cur, &tmp, S_##name_, sizeof(S_##name_) - 1)) { \
-      tk = TokenList_push(tks);                                      \
-      tk->id = ID_##name_;                                           \
-      tk->pos = cur;                                                 \
+      tk = TokenS_push(tks, Token_new(ID_##name_, cur));             \
       cur = tmp;                                                     \
       continue;                                                      \
     }                                                                \
@@ -361,37 +351,42 @@ TokenList* tokenize(Context* context) {
     match_reserved(CONST);
     match_reserved(VLTLE);
 
-    if (macro_mode) {
-      match_reserved(PP_DEFINED);
-      match_reserved(PP_IFNDEF);
-      match_reserved(PP_IFDEF);
-      match_reserved(PP_IF);
-      match_reserved(PP_ELIF);
-      match_reserved(PP_ELSE);
-      match_reserved(PP_DEF);
-      match_reserved(PP_PRAGMA);
-      match_reserved(PP_ENDIF);
-      {  // PP_INCLUDE
-        const char* tmp;
-        if (match_strict(cur, &tmp, S_PP_INCLUDE, sizeof(S_PP_INCLUDE) - 1)) {
-          tk = TokenList_push(tks);
-          tk->id = ID_PP_INCLUDE;
-          tk->pos = cur;
-          cur = tmp;
-          macro_mode = ID_PP_INCLUDE;
-          continue;
+    {  // PP_SYMBL
+      const char* tmp;
+      if (match(cur, &tmp, S_PP_SYMBL, sizeof(S_PP_SYMBL) - 1)) {
+        tk = TokenS_push(tks, Token_new(ID_PP_SYMBL, cur));
+        cur = tmp;
+        macro_mode = true;
+
+        match_reserved(PP_DEFINED);
+        match_reserved(PP_IFNDEF);
+        match_reserved(PP_IFDEF);
+        match_reserved(PP_IF);
+        match_reserved(PP_ELIF);
+        match_reserved(PP_ELSE);
+        match_reserved(PP_DEF);
+        match_reserved(PP_PRAGMA);
+        match_reserved(PP_ENDIF);
+        {  // PP_INCLUDE
+          const char* tmp;
+          if (match_strict(cur, &tmp, S_PP_INCLUDE, sizeof(S_PP_INCLUDE) - 1)) {
+            tk = TokenS_push(tks, Token_new(ID_PP_INCLUDE, cur));
+            cur = tmp;
+            macro_mode = ID_PP_INCLUDE;
+            continue;
+          }
         }
+        match_reserved(PP_UNDEF);
+
+        continue;
       }
-      match_reserved(PP_UNDEF);
     }
     {
       const char* tmp;
       long x = strntol(cur, &tmp, 10, 128);
       if (*tmp == '.') ERROR(cur, "Not support float");
       if (tmp != cur) {
-        tk = TokenList_push(tks);
-        tk->id = ID_CONST_INT;
-        tk->pos = cur;
+        tk = TokenS_push(tks, Token_new(ID_CONST_INT, cur));
         tk->const_int = x;
 
         cur = tmp;
@@ -402,11 +397,8 @@ TokenList* tokenize(Context* context) {
       // const char* tmp;
       // double x = strntod(cur, &tmp, 128);
       // if (tmp != cur) {
-      //   tk = TokenList_push(tks);
-      //   tk->id = ID_CONST_FLOAT;
-      //   tk->pos = cur;
+      //   tk = TokenS_push(tks, Token_new(ID_CONST_FLOAT, cur));
       //   tk->const_float = x;
-
       //   cur = tmp;
       //   continue;
       // }
@@ -417,9 +409,7 @@ TokenList* tokenize(Context* context) {
       assert(tmp != next(cur));
       if (*tmp != '\'') ERROR(tmp, "expected \'\\\'\' ");
 
-      tk = TokenList_push(tks);
-      tk->id = ID_CHAR;
-      tk->pos = cur;
+      tk = TokenS_push(tks, Token_new(ID_CONST_CHAR, cur));
       tk->const_int = c;
 
       cur = next(tmp);
@@ -440,9 +430,7 @@ TokenList* tokenize(Context* context) {
       char* str = malloc(len + 1);
       copy_n(str, next(cur), len), str[len] = '\0';
 
-      tk = TokenList_push(tks);
-      tk->id = ID_STR;
-      tk->pos = cur;
+      tk = TokenS_push(tks, Token_new(ID_STR, cur));
       tk->corrected = Dict_push(context->dict, str);
       if (tk->corrected != str) {
         free(str);
@@ -463,9 +451,7 @@ TokenList* tokenize(Context* context) {
       ident[len] = '\0';
       assert(len <= MAX_IDENT);
 
-      tk = TokenList_push(tks);
-      tk->id = ID_IDENT;
-      tk->pos = cur;
+      tk = TokenS_push(tks, Token_new(ID_IDENT, cur));
       tk->corrected = Dict_push_copy(context->dict, ident);
 
       cur = tmp;
@@ -475,9 +461,7 @@ TokenList* tokenize(Context* context) {
     ERROR(cur, "Internal Error: cannot tokenize");
   }
 
-  tk = TokenList_push(tks);
-  tk->id = ID_END;
-  tk->pos = cur;
+  tk = TokenS_push(tks, Token_new(ID_EOF, cur));
   return tks;
 }
 #undef match_symbol

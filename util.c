@@ -1,7 +1,7 @@
 #include <assert.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 
 #include "mycc.h"
 
@@ -39,6 +39,13 @@ const char* read_text(const char* path) {
     self->len = 0;                                               \
     return self;                                                 \
   }                                                              \
+  Self* Self##_withsize(int size) {                              \
+    Self* self = malloc(sizeof(Self));                           \
+    self->buf_l = size;                                          \
+    self->buf = malloc(sizeof(Type) * self->buf_l);              \
+    self->len = 0;                                               \
+    return self;                                                 \
+  }                                                              \
   Type* Self##_push(Self* self) {                                \
     if (self->buf_l == self->len) {                              \
       Type* dst = malloc(sizeof(Type) * self->buf_l * 2);        \
@@ -64,6 +71,7 @@ const char* read_text(const char* path) {
     return &(self->buf)[idx];                                    \
   }                                                              \
   bool Self##_empty(const Self* self) { return self->len == 0; } \
+  void Self##_clear(Self* self) { self->len = 0; }               \
   void Self##_free(Self* self) {                                 \
     free(self->buf);                                             \
     free(self);                                                  \
@@ -71,8 +79,49 @@ const char* read_text(const char* path) {
 Vec_define(Vec, void*);
 Vec_define(IntV, int);
 Vec_define(StrV, const char*);
-Vec_define(TokenList, Token);
 #undef Vec_define
+
+TokenS* TokenS_new() { return TokenS_withsize(8); }
+TokenS* TokenS_withsize(int size) {
+  TokenS* x = malloc(sizeof(TokenS));
+  x->buf_len = size;
+  x->buf = malloc(sizeof(Token*) * x->buf_len);
+  x->len = 0;
+  return x;
+}
+static void TokenS_update(TokenS* self) {
+  if (self->buf_len == self->len) {
+    Token** buf = malloc(sizeof(Token*) * self->buf_len * 2);
+    memcpy(buf, self->buf, sizeof(Token*) * self->buf_len);
+    free(self->buf);
+    self->buf = buf;
+    self->buf_len *= 2;
+  }
+}
+Token* TokenS_push(TokenS* self, Token* tk) {
+  TokenS_update(self);
+  self->buf[self->len++] = tk;
+  return tk;
+}
+Token* TokenS_pop(TokenS* self) {
+  if (TokenS_empty(self)) return NULL;
+  self->len -= 1;
+  Token* tk = self->buf[self->len];
+  return tk;
+}
+Token* TokenS_get(TokenS* self, int idx) {
+  assert(self->len > idx && idx >= 0);
+  return self->buf[idx];
+}
+TokenS* TokenS_clear(TokenS* self) {
+  self->len = 0;
+  return self;
+}
+bool TokenS_empty(const TokenS* self) { return self->len == 0; }
+void TokenS_free(TokenS* self) {
+  free(self->buf);
+  free(self);
+}
 
 Dict* Dict_new() {
   Dict* self = malloc(sizeof(Dict));
@@ -93,8 +142,7 @@ static void Dict_update(Dict* self) {
     self->buf_len *= 2;
   }
 }
-static
-const char* _Dict_push(Dict* self, DictEntry* now, const char* key) {
+static const char* _Dict_push(Dict* self, DictEntry* now, const char* key) {
   int res = strcmp(now->x, key);
   if (res > 0) {
     if (now->lhs == -1) {
@@ -133,8 +181,8 @@ const char* Dict_push(Dict* self, const char* s) {
   }
   return _Dict_push(self, self->buf, s);
 }
-static
-const char* _Dict_push_copy(Dict* self, DictEntry* now, const char* key) {
+static const char* _Dict_push_copy(Dict* self, DictEntry* now,
+                                   const char* key) {
   int res = strcmp(now->x, key);
   if (res > 0) {
     if (now->lhs == -1) {
@@ -168,7 +216,7 @@ const char* Dict_push_copy(Dict* self, const char* s) {
     x->x = mstrncpy(s, strlen(s));
     x->lhs = -1;
     x->rhs = -1;
-    
+
     self->len++;
     return x->x;
   }
@@ -177,8 +225,12 @@ const char* Dict_push_copy(Dict* self, const char* s) {
 bool Dict_empty(const Dict* self) { return self->len == 0; }
 bool _Dict_contain(const Dict* self, const DictEntry* now, const char* s) {
   int res = strcmp(now->x, s);
-  if (res < 0) return (now->lhs == -1)? false : _Dict_contain(self, self->buf + now->lhs, s);
-  if (res > 0) return (now->rhs == -1)? false : _Dict_contain(self, self->buf + now->rhs, s);
+  if (res < 0)
+    return (now->lhs == -1) ? false
+                            : _Dict_contain(self, self->buf + now->lhs, s);
+  if (res > 0)
+    return (now->rhs == -1) ? false
+                            : _Dict_contain(self, self->buf + now->rhs, s);
   return true;
 }
 bool Dict_contain(const Dict* self, const char* s) {

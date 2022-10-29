@@ -19,17 +19,32 @@ const char* read_text(const char* path);
     uint len;                                   \
   } Self;                                       \
   Self* Self##_new();                           \
+  Self* Self##_withsize(int size);              \
   Type* Self##_push(Self* self);                \
   bool Self##_pop(Self* self);                  \
   Type* Self##_get(const Self* self, uint idx); \
   bool Self##_empty(const Self* self);          \
+  void Self##_clear(Self* self);                \
   void Self##_free(Self* self);
 
 Vec_define(Vec, void*);
 Vec_define(IntV, int);
 Vec_define(StrV, const char*);
-Vec_define(TokenList, Token);
 #undef Vec_define
+
+typedef struct {
+  Token** buf;
+  long buf_len;
+  long len;
+} TokenS;
+TokenS* TokenS_new();
+TokenS* TokenS_withsize(int size);
+Token* TokenS_push(TokenS* self, Token* tk);
+Token* TokenS_pop(TokenS* self);
+Token* TokenS_get(TokenS* self, int idx);
+TokenS* TokenS_clear(TokenS* self);
+bool TokenS_empty(const TokenS* self);
+void TokenS_free(TokenS* self);
 
 typedef struct {
   const char* x;
@@ -37,9 +52,9 @@ typedef struct {
   int rhs;
 } DictEntry;
 typedef struct Dict {
-  DictEntry*buf;
+  DictEntry* buf;
   int buf_len;
-  int len; 
+  int len;
 } Dict;
 Dict* Dict_new();
 const char* Dict_push(Dict* self, const char* s);
@@ -56,7 +71,6 @@ char* pathname(char* dst, const char* path);
 char* pathparen(char* dst, const char* path);
 char* pathcat(char* base, const char* relative);
 
-
 typedef struct {
   const char* name;
   const char* content;
@@ -66,11 +80,11 @@ typedef struct {
 
 // error.c
 
-const char* position_info(const char* content, const char* pos, int *x, int *y);
+const char* position_info(const char* content, const char* pos, int* x, int* y);
 void print_error(const char* name, const char* content, const char* pos,
                  char* fmt, ...);
 void print_warning(const char* name, const char* content, const char* pos,
-                 char* fmt, ...);
+                   char* fmt, ...);
 
 // tokenize.c
 #define MAX_IDENT 128
@@ -89,10 +103,11 @@ struct Token {
   // Const Float
   // double const_float;
 };
-#define tkislast(tk) ((tk)->id == ID_END)
+#define tk_eof(tk) ((tk)->id == ID_EOF)
+Token* Token_new(IDs id, const char* pos);
 
-extern TokenList* tokenize(Context* context);
+extern TokenS* tokenize(Context* context);
 
 // pp.c
 #define MAX_INCLUDE_DEPTH 6
-TokenList* preprocess(Context* context, Token *input);
+TokenS* preprocess(Context* context, TokenS* input);

@@ -14,15 +14,15 @@ int main() {
     {
       *StrV_push(context.include_path) = "/usr/include";
     }
-    TokenList* tokenized = tokenize(&context);
-    TokenList* pped = preprocess(&context, tokenized->buf);
+    TokenS* tokenized = tokenize(&context);
+    TokenS* pped = preprocess(&context, tokenized);
 
-    for(Token* cur = pped->buf; !tkislast(cur); cur++ ) {
-      if(cur->id == ID_STR || cur->id == ID_IDENT || cur->id == ID_PP_INCLUDE_PATH) {
+    for(Token** cur = pped->buf; !tk_eof(*cur); cur++ ) {
+      if((*cur)->id == ID_STR || (*cur)->id == ID_IDENT || (*cur)->id == ID_PP_INCLUDE_PATH) {
         // int x, y;
         // position_info(s, cur->pos, &x, &y);
         // printf("%s:%d:%d: ", path, y, x);
-        printf("%ld: %s\n", (long)cur->corrected, cur->corrected);
+        printf("%ld: %s\n", (long)(*cur)->corrected, (*cur)->corrected);
       }
     }
 

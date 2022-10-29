@@ -69,12 +69,27 @@ static const char* find_include_path(Context* context, const char* path,
   abort();
 }
 
+#define POP(tks) TokenS_pop(tks)
+#define PUSH(tks, tk) TokenS_push(tks, tk)
 static bool match(const Token* input, const Token** ls, IDs id) {
   if (input->id == id) {
     *ls = ++input;
     return true;
   }
   return false;
+}
+
+static void reverse(void** buf, int n) {
+  for (int i = 0; i < n / 2; i++) {
+    void* tmp = buf[i];
+    buf[i] = buf[n - 1 - i];
+    buf[n - 1 - i] = tmp;
+  }
+}
+
+static TokenS* TokenS_reverse(TokenS* tks) {
+  reverse((void**)tks->buf, tks->len);
+  return tks;
 }
 
 typedef struct {
@@ -97,96 +112,124 @@ void* Macros_pushf(Macros* self, int key, Macro* item) {
 Macro* Macros_contain(Macros self, int key) { return Avl_contain(self.t, key); }
 void Macros_free(Macros self) { Avl_free(self.t); }
 
-void _expand(Context* context, const Token* input, Macros* macros,
-             TokenList* output);
+void _expand(Context* context, TokenS* input_r, Macros* macros, TokenS* output);
 
-void expand_include(Context* context, const Token* args, Macros* macros,
-                    TokenList* output) {
-  assert(args->id == ID_STR || args->id == ID_PP_INCLUDE_PATH);
-  assert(args[1].id == ID_PP_END);
+void expand_include(Context* context, TokenS* input_r, Macros* macros,
+                    TokenS* output) {
+  Token* arg = POP(input_r);
+  assert(arg->id == ID_STR || arg->id == ID_PP_INCLUDE_PATH);
+  Token* pp_end = POP(input_r);
+  assert(pp_end->id == ID_PP_END);
 
   const char* path =
-      find_include_path(context, args->corrected, (args->id == ID_STR));
+      find_include_path(context, arg->corrected, (arg->id == ID_STR));
   assert(path != NULL);
   const char* content = read_text(path);
   assert(content != NULL);
 
   // マクロ情報だけ継承して更に展開
   Context ctx = {path, content, context->dict};
-  TokenList* tokenized = tokenize(&ctx);
-  _expand(&ctx, tokenized->buf, macros, output);
+  TokenS* tokenized = tokenize(&ctx);
+  _expand(&ctx, TokenS_reverse(tokenized), macros, output);
 
   free((void*)content);
   free((void*)path);
+  free(arg);
+  free(pp_end);
 }
 
-void _expand(Context* context, const Token* input, Macros* macros,
-             TokenList* output) {
-  while (!tkislast(input)) {
-    if (match(input, &input, ID_PP_SYMBL)) {
-      if (match(input, &input, ID_PP_INCLUDE)) {
-        expand_include(context, input, macros, output);
+void _expand(Context* context, TokenS* input_r, Macros* macros,
+             TokenS* output) {
+  while (!TokenS_empty(input_r)) {
+    Token* input = POP(input_r);
+    if (input->id == ID_PP_SYMBL) {
+      Token* key = POP(input_r);
+      if (key->id == ID_PP_INCLUDE) {
+        expand_include(context, input_r, macros, output);
+
+        free(input);
+        free(key);
         continue;
       }
-      if (match(input, &input, ID_PP_END)) {
+      if (key->id == ID_PP_DEF) {
+        abort();
+        free(input);
+        free(key);
         continue;
       }
+      if (key->id == ID_PP_IF) {
+        abort();
+        free(input);
+        free(key);
+        continue;
+      }
+      if (key->id == ID_PP_IFDEF) {
+        abort();
+        free(input);
+        free(key);
+        continue;
+      }
+      if (key->id == ID_PP_IFNDEF) {
+        abort();
+        free(input);
+        free(key);
+        continue;
+      }
+      if (key->id == ID_PP_END) {
+        free(input);
+        free(key);
+        continue;
+      }
+      abort();
     }
 
-    Token* tk = TokenList_push(output);
-    memcpy(tk, input, sizeof(Token));
-    input++;
+    TokenS_push(output, input);
   }
-
-  Token* tk = TokenList_push(output);
-  memcpy(tk, input, sizeof(Token));
 }
 
-TokenList* expand(Context* context, Token* input) {
-  TokenList* tks = TokenList_new();
+TokenS* expand(Context* context, TokenS* inputs) {
+  TokenS* outputs = TokenS_new();
   Macros macros = Macros_new();
-  _expand(context, input, &macros, tks);
-  return tks;
+
+  _expand(context, TokenS_reverse(inputs), &macros, outputs);
+
+  return outputs;
 }
 
-TokenList* conbine_str(Context* context, Token* input) {
-  TokenList* tks = TokenList_new();
+TokenS* conbine_str(Context* context, TokenS* inputs) {
+  TokenS* outputs = TokenS_new();
+  TokenS_push(inputs, NULL);  // iterator の終了判定
 
-  while (!tkislast(input)) {
-    if (input->id == ID_STR) {
+  Token** input = inputs->buf;
+  while (*input != NULL) {
+    if ((*input)->id == ID_STR) {
       int c = 0;
-      for (Token* tmp = input; tmp->id == ID_STR; tmp++) {
+      for (Token* tmp = (*input); tmp->id == ID_STR; tmp++) {
         c++;
       }
       if (c > 1) {
         int len_sum = 0;
         for (int i = 0; i < c; i++) {
-          len_sum += strlen(input[i].corrected);
+          len_sum += strlen(input[i]->corrected);
         }
         char* combined = malloc(len_sum + 1);
         combined[0] = '\0';
-        for (int i = 0; i < c; i++) strcat(combined, input[i].corrected);
+        for (int i = 0; i < c; i++) strcat(combined, input[i]->corrected);
 
-        Token* tk = TokenList_push(tks);
-        tk->id = ID_STR;
-        tk->pos = input->pos;
+        Token* tk = TokenS_push(outputs, Token_new(ID_STR, (*input)->pos));
         tk->corrected = Dict_push(context->dict, combined);
 
         input = input + c;
         continue;
       }
     }
-    Token* tk = TokenList_push(tks);
-    memcpy(tk, input, sizeof(Token));
+    Token* tk = TokenS_push(outputs, *input);
     input++;
   }
-
-  Token* tk = TokenList_push(tks);
-  memcpy(tk, input, sizeof(Token));
-  return tks;
+  return outputs;
 }
 
-TokenList* preprocess(Context* context, Token* input) {
+TokenS* preprocess(Context* context, TokenS* input) {
   //前から読んでいきながら、Macroデータベースを更新
   // includeを見つけたら展開し、展開後のはじめからスタート
   // ifdef, ifndef
@@ -203,7 +246,7 @@ TokenList* preprocess(Context* context, Token* input) {
   // IDENT　のときは値マクロなので、値マクロ登録の処理
   //データベースにある識別子を見つけた^呼び出し可能になっている(正当な引数がついている)ならば
   //マクロ展開
-  TokenList* expanded = expand(context, input);
-  TokenList* combined = conbine_str(context, expanded->buf);
+  TokenS* expanded = expand(context, input);
+  TokenS* combined = conbine_str(context, expanded);
   return combined;
 }
