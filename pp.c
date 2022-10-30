@@ -111,13 +111,14 @@ Macros Macros_new() {
   Macros res = {Map_new()};
   return res;
 }
-bool Macros_push(Macros* self, int key, Macro* item) {
+bool Macros_push(Macros* self, long key, Macro* item) {
   return Map_push(&self->t, key, item);
 }
-Macro* Macros_pushf(Macros* self, int key, Macro* item) {
+Macro* Macros_pushf(Macros* self, long key, Macro* item) {
   return Map_pushf(&self->t, key, item);
 }
-Macro* Macros_contain(Macros self, int key) { return Map_contain(self.t, key); }
+Macro* Macros_contain(Macros self, long key) { return Map_contain(self.t, key); }
+Macro* Macros_delete(Macros* self, long key) { return Map_delete(&self->t, key); }
 void Macros_free(Macros self) { Map_free(self.t); }
 
 void _expand(Context* context, Vec* input_r, Macros* macros, Vec* output);
@@ -205,13 +206,13 @@ void jump_to_else_elif_endif(Vec* input_r) {
         CHECK(input_r, ID_PP_IFNDEF)) {
       if_count++;
     }
-    if (CHECK(input_r, ID_PP_ENDIF) && if_count != 0) if_count--;
     if (CHECK(input_r, ID_PP_ENDIF) || CHECK(input_r, ID_PP_ELSE) ||
         CHECK(input_r, ID_PP_ELIF)) {
       if (if_count == 0) {
         break;
       }
     }
+    if (CHECK(input_r, ID_PP_ENDIF) && if_count != 0) if_count--;
     assert(if_count >= 0);
     free(POP(input_r));
   }
@@ -362,6 +363,19 @@ void _expand(Context* context, Vec* input_r, Macros* macros,
         free(POP(input_r));
         // todo: 今はすべて無視
         while(!CHECK(input_r, ID_PP_END)) free(POP(input_r));
+        free(POP(input_r));
+        continue;
+      }
+      if (CHECK(input_r, ID_PP_UNDEF)) {
+        free(POP(input_r));
+        assert(CHECK(input_r, ID_IDENT));
+        Token* ident = POP(input_r);
+
+        Macro* macro = Macros_delete(macros, (long)ident->corrected);
+        if (macro) free(macro);
+
+        free(ident);
+        assert(CHECK(input_r, ID_PP_END));
         free(POP(input_r));
         continue;
       }

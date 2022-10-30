@@ -199,9 +199,9 @@ void Map_print_keys(Map t) {
 }
 
 /* delete and return minimum value in a tree */
-static int Map_delete_min(Map *t, void **item) {
+static long Map_delete_min(Map *t, void **item) {
   Map oldroot;
-  int minValue;
+  long minValue;
 
   assert(t != MAP_EMPTY);
 
@@ -225,7 +225,7 @@ static int Map_delete_min(Map *t, void **item) {
 void *Map_delete(Map *t, long key) {
   Map oldroot;
 
-  if (*t != MAP_EMPTY) {
+  if (*t == MAP_EMPTY) {
     return NULL;
   } else if ((*t)->key == key) {
     void *item = (*t)->item;

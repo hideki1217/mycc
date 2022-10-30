@@ -33,6 +33,38 @@
 
 #endif
 
+
+#define HHH ahahah
+#undef HHH
+
+#ifdef HHH // false
+
+#ifdef HUGA // false
+"xxxx";
+#else
+"oooo";
+#endif
+
+#else
+
+"xx";
+
+#endif
+
+#ifndef HHH // true
+
+"xx";
+
+#else
+
+#ifndef HUGA // true
+"ooooo";
+#else
+"xx";
+#endif
+
+#endif
+
 HOGE;
 
 #ifdef COMP // false
