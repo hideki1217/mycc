@@ -1,8 +1,8 @@
 #include <assert.h>
 #include <dirent.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 
 #include "mycc.h"
 
@@ -71,13 +71,15 @@ static const char* find_include_path(Context* context, const char* path,
 
 #define POP(tks) ((Token*)Vec_pop(tks))
 #define CHECK_NTH(tks_, id_, x_) \
-  (((tks_)->len < (x_)) ? false  \
-                        : (((Token**)((tks_)->buf))[(tks_)->len - 1 - (x_)]->id == id_))
+  (((tks_)->len < (x_))          \
+       ? false                   \
+       : (((Token**)((tks_)->buf))[(tks_)->len - 1 - (x_)]->id == id_))
 #define CHECK(tks_, id_) CHECK_NTH(tks_, id_, 0)
-#define CHECK2(tks_, id0_, id1_)                                     \
-  (((tks_)->len < 2) ? false                                         \
-                     : (((Token**)((tks_)->buf))[(tks_)->len - 1]->id == id0_) && \
-                           (((Token**)((tks_)->buf))[(tks_)->len - 2]->id == id1_))
+#define CHECK2(tks_, id0_, id1_)                                    \
+  (((tks_)->len < 2)                                                \
+       ? false                                                      \
+       : (((Token**)((tks_)->buf))[(tks_)->len - 1]->id == id0_) && \
+             (((Token**)((tks_)->buf))[(tks_)->len - 2]->id == id1_))
 static bool match(const Token* input, const Token** ls, IDs id) {
   if (input->id == id) {
     *ls = ++input;
@@ -117,8 +119,12 @@ bool Macros_push(Macros* self, long key, Macro* item) {
 Macro* Macros_pushf(Macros* self, long key, Macro* item) {
   return Map_pushf(&self->t, key, item);
 }
-Macro* Macros_contain(Macros self, long key) { return Map_contain(self.t, key); }
-Macro* Macros_delete(Macros* self, long key) { return Map_delete(&self->t, key); }
+Macro* Macros_contain(Macros self, long key) {
+  return Map_contain(self.t, key);
+}
+Macro* Macros_delete(Macros* self, long key) {
+  return Map_delete(&self->t, key);
+}
 void Macros_free(Macros self) { Map_free(self.t); }
 
 void _expand(Context* context, Vec* input_r, Macros* macros, Vec* output);
@@ -139,17 +145,17 @@ void expand_include(Context* context, Vec* input_r, Macros* macros,
   // マクロ情報だけ継承して更に展開
   Context ctx = {path, content, context->dict, context->include_path};
   Vec* tokenized = tokenize(&ctx);
-  
+
   Token* eof = POP(tokenized);
   assert(eof->id == ID_EOF);
-  free(eof);
-  
+  Token_free(eof);
+
   _expand(&ctx, Vec_reverse(tokenized), macros, output);
 
   free((void*)content);
   free((void*)path);
-  free(arg);
-  free(pp_end);
+  Token_free(arg);
+  Token_free(pp_end);
 }
 
 void add_macro(Context* context, Macros* macros, Vec* input_r) {
@@ -160,13 +166,13 @@ void add_macro(Context* context, Macros* macros, Vec* input_r) {
   Vec* ts = Vec_new();
   if (CHECK(input_r, ID_L0)) {
     // functional
-    free(POP(input_r));
+    Token_free(POP(input_r));
 
     args = Vec_new();
     /* ((IDENT,)*(IDENT(...)? | ...)?) */
     while (CHECK2(input_r, ID_IDENT, ID_C0)) {
       Vec_push(args, POP(input_r));
-      free(POP(input_r));
+      Token_free(POP(input_r));
     }
     if (CHECK2(input_r, ID_IDENT, ID_CCC)) {
       Vec_push(args, POP(input_r));
@@ -184,13 +190,13 @@ void add_macro(Context* context, Macros* macros, Vec* input_r) {
       abort();
 
     assert(CHECK(input_r, ID_R0));
-    free(POP(input_r));
+    Token_free(POP(input_r));
   }
 
   while (!CHECK(input_r, ID_PP_END)) {
     Vec_push(ts, POP(input_r));
   }
-  free(POP(input_r));  // ID_PP_END
+  Token_free(POP(input_r));  // ID_PP_END
 
   Macro* macro = malloc(sizeof(Macro));
   macro->args = args;
@@ -214,7 +220,7 @@ void jump_to_else_elif_endif(Vec* input_r) {
     }
     if (CHECK(input_r, ID_PP_ENDIF) && if_count != 0) if_count--;
     assert(if_count >= 0);
-    free(POP(input_r));
+    Token_free(POP(input_r));
   }
   assert(CHECK(input_r, ID_PP_ENDIF) || CHECK(input_r, ID_PP_ELSE) ||
          CHECK(input_r, ID_PP_ELIF));
@@ -227,12 +233,14 @@ void jump_to_endif(Vec* input_r) {
         CHECK(input_r, ID_PP_IFNDEF)) {
       if_count++;
     }
-    if (CHECK(input_r, ID_PP_ENDIF)){
-      if (if_count != 0) if_count--;
-      else break;
-    } 
+    if (CHECK(input_r, ID_PP_ENDIF)) {
+      if (if_count != 0)
+        if_count--;
+      else
+        break;
+    }
     assert(if_count >= 0);
-    free(POP(input_r));
+    Token_free(POP(input_r));
   }
   assert(CHECK(input_r, ID_PP_ENDIF));
 }
@@ -250,24 +258,24 @@ int if_jump(Macros* macros, Vec* input_r, bool cond) {
       jump_to_else_elif_endif(input_r);
       Token* key = POP(input_r);
       if (key->id == ID_PP_ELSE) {
-        free(key);
+        Token_free(key);
         assert(CHECK(input_r, ID_PP_END));
-        free(POP(input_r));
+        Token_free(POP(input_r));
 
         return 1;
       }
       if (key->id == ID_PP_ENDIF) {
-        free(key);
+        Token_free(key);
         assert(CHECK(input_r, ID_PP_END));
-        free(POP(input_r));
+        Token_free(POP(input_r));
 
         return 0;
       }
       if (key->id == ID_PP_ELIF) {
-        free(key);
+        Token_free(key);
         bool cond = eval_if(macros, input_r);
         assert(CHECK(input_r, ID_PP_END));
-        free(POP(input_r));
+        Token_free(POP(input_r));
 
         if (cond) {
           return 1;
@@ -277,110 +285,109 @@ int if_jump(Macros* macros, Vec* input_r, bool cond) {
   }
 }
 
-void _expand(Context* context, Vec* input_r, Macros* macros,
-             Vec* output) {
+void _expand(Context* context, Vec* input_r, Macros* macros, Vec* output) {
   int if_count = 0;
   while (!Vec_empty(input_r)) {
     if (CHECK(input_r, ID_PP_SYMBL)) {
-      free(POP(input_r));
+      Token_free(POP(input_r));
 
       if (CHECK(input_r, ID_PP_INCLUDE)) {
-        free(POP(input_r));
+        Token_free(POP(input_r));
 
         expand_include(context, input_r, macros, output);
         continue;
       }
       if (CHECK(input_r, ID_PP_DEF)) {
-        free(POP(input_r));
+        Token_free(POP(input_r));
 
         add_macro(context, macros, input_r);
         continue;
       }
       if (CHECK(input_r, ID_PP_IF)) {
-        free(POP(input_r));
+        Token_free(POP(input_r));
 
         bool cond = eval_if(macros, input_r);
         assert(CHECK(input_r, ID_PP_END));
-        free(POP(input_r));  // ID_PP_END
+        Token_free(POP(input_r));  // ID_PP_END
 
         if_count += if_jump(macros, input_r, cond);
         continue;
       }
       if (CHECK(input_r, ID_PP_IFDEF)) {
-        free(POP(input_r));
+        Token_free(POP(input_r));
 
         assert(CHECK(input_r, ID_IDENT));
         Token* ident = POP(input_r);
         bool cond = Macros_contain(*macros, (long)ident->corrected) != NULL;
 
-        free(ident);
+        Token_free(ident);
         assert(CHECK(input_r, ID_PP_END));
-        free(POP(input_r));  // ID_PP_END
+        Token_free(POP(input_r));  // ID_PP_END
 
         if_count += if_jump(macros, input_r, cond);
         continue;
       }
       if (CHECK(input_r, ID_PP_IFNDEF)) {
-        free(POP(input_r));
+        Token_free(POP(input_r));
 
         assert(CHECK(input_r, ID_IDENT));
         Token* ident = POP(input_r);
         bool cond = Macros_contain(*macros, (long)ident->corrected) == NULL;
 
-        free(ident);
+        Token_free(ident);
         assert(CHECK(input_r, ID_PP_END));
-        free(POP(input_r));  // ID_PP_END
+        Token_free(POP(input_r));  // ID_PP_END
 
         if_count += if_jump(macros, input_r, cond);
         continue;
       }
       if (CHECK(input_r, ID_PP_ELSE) || CHECK(input_r, ID_PP_ELIF)) {
-        free(POP(input_r));
+        Token_free(POP(input_r));
 
         assert(if_count > 0);
         if_count--;
 
         jump_to_endif(input_r);
         assert(CHECK(input_r, ID_PP_ENDIF));
-        free(POP(input_r));
+        Token_free(POP(input_r));
         assert(CHECK(input_r, ID_PP_END));
-        free(POP(input_r));
+        Token_free(POP(input_r));
 
         continue;
       }
       if (CHECK(input_r, ID_PP_ENDIF)) {
-        free(POP(input_r));
+        Token_free(POP(input_r));
 
         assert(if_count > 0);
         if_count--;
 
         assert(CHECK(input_r, ID_PP_END));
-        free(POP(input_r));
+        Token_free(POP(input_r));
 
         continue;
       }
       if (CHECK(input_r, ID_PP_PRAGMA)) {
-        free(POP(input_r));
+        Token_free(POP(input_r));
         // todo: 今はすべて無視
-        while(!CHECK(input_r, ID_PP_END)) free(POP(input_r));
-        free(POP(input_r));
+        while (!CHECK(input_r, ID_PP_END)) Token_free(POP(input_r));
+        Token_free(POP(input_r));
         continue;
       }
       if (CHECK(input_r, ID_PP_UNDEF)) {
-        free(POP(input_r));
+        Token_free(POP(input_r));
         assert(CHECK(input_r, ID_IDENT));
         Token* ident = POP(input_r);
 
         Macro* macro = Macros_delete(macros, (long)ident->corrected);
         if (macro) free(macro);
 
-        free(ident);
+        Token_free(ident);
         assert(CHECK(input_r, ID_PP_END));
-        free(POP(input_r));
+        Token_free(POP(input_r));
         continue;
       }
       if (CHECK(input_r, ID_PP_END)) {
-        free(POP(input_r));
+        Token_free(POP(input_r));
         continue;
       }
       abort();
@@ -423,7 +430,7 @@ Vec* conbine_str(Context* context, Vec* inputs) {
         Token* tk = Vec_push(outputs, Token_new(ID_STR, (*input)->pos));
         tk->corrected = Dict_push(&context->dict, combined);
 
-        for(int i=0; i<c; i++) free(input[i]);
+        for (int i = 0; i < c; i++) Token_free(input[i]);
 
         input = input + c;
         continue;

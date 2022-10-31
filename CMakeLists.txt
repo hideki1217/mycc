@@ -17,6 +17,7 @@ add_library(mycc_lib STATIC
     dict.c
     map.c
     buf.c
+    set.c
     pp.c
 )
 

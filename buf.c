@@ -44,7 +44,7 @@ const char* Buf_ref(Buf* self) {
 }
 char* Buf_into_str(Buf* self) {
   Buf_eof(self);
-  const char* res = self->p;
+  char* res = self->p;
   free(self);
   return res;
 }

@@ -60,6 +60,16 @@ void Buf_eof(Buf* self);
 const char* Buf_ref(Buf* self);
 char* Buf_into_str(Buf* self);
 
+typedef struct setNode* Set;
+#define SET_EMPTY NULL
+
+#define Set_new() SET_EMPTY
+bool Set_push(Set self, long item);
+Set Set_cpy(Set self);
+Set Set_union(Set self, Set rhs);
+Set Set_cross(Set self, Set rhs);
+void Set_free(Set set);
+
 // path.c
 #define MAX_PATH 512
 int pathisabs(const char* path);
@@ -88,6 +98,7 @@ void print_warning(const char* name, const char* content, const char* pos,
 struct Token {
   IDs id;
   const char* pos;
+  Set hideset;  // 所有権あり
 
   // Ident
   // Str
@@ -102,6 +113,7 @@ struct Token {
 };
 #define tk_eof(tk) ((tk)->id == ID_EOF)
 Token* Token_new(IDs id, const char* pos);
+void Token_free(Token* tk);
 void tk2s(Token* tk, Buf* buf);
 
 extern Vec* tokenize(Context* context);

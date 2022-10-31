@@ -184,7 +184,12 @@ Token* Token_new(IDs id, const char* pos) {
   res->id = id;
   res->pos = pos;
   res->corrected = NULL;
+  res->hideset = SET_EMPTY;
   return res;
+}
+void Token_free(Token* tk) {
+  Set_free(tk->hideset);
+  free(tk);
 }
 
 Vec* tokenize(Context* context) {
@@ -256,7 +261,7 @@ Vec* tokenize(Context* context) {
   {                                                           \
     const char* tmp;                                          \
     if (match(cur, &tmp, S_##name_, sizeof(S_##name_) - 1)) { \
-      tk = Vec_push(tks, Token_new(ID_##name_, cur));      \
+      tk = Vec_push(tks, Token_new(ID_##name_, cur));         \
       cur = tmp;                                              \
       continue;                                               \
     }                                                         \
@@ -313,7 +318,7 @@ Vec* tokenize(Context* context) {
   {                                                                  \
     const char* tmp;                                                 \
     if (match_strict(cur, &tmp, S_##name_, sizeof(S_##name_) - 1)) { \
-      tk = Vec_push(tks, Token_new(ID_##name_, cur));             \
+      tk = Vec_push(tks, Token_new(ID_##name_, cur));                \
       cur = tmp;                                                     \
       continue;                                                      \
     }                                                                \
