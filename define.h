@@ -196,7 +196,7 @@ typedef enum ID {
 
   ID_IDENT,
   ID_CONST_INT,
-  ID_CONST_FLOAT,
+  // ID_CONST_FLOAT,
   ID_CONST_CHAR,
   ID_STR,
 

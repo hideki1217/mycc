@@ -27,24 +27,38 @@ Vec* Vec_clear(Vec* self);
 bool Vec_empty(const Vec* self);
 void Vec_free(Vec* self);
 
-typedef struct DictNode *Dict;
+typedef struct DictNode* Dict;
 #define DICT_EMPTY NULL
 #define Dict_new() DICT_EMPTY
 const char* Dict_push(Dict* self, const char* s);
 const char* Dict_push_copy(Dict* self, const char* s);
 #define Dict_empty(self) ((self) == DICT_EMPTY)
-const char *Dict_contain(Dict self, const char* s);
+const char* Dict_contain(Dict self, const char* s);
 void Dict_free(Dict t);
 
-typedef struct mapNode *Map;
+typedef struct mapNode* Map;
 #define MAP_EMPTY NULL
 #define Map_new() MAP_EMPTY
 void Map_free(Map t);
-void *Map_contain(Map t, long key);
-int Map_push(Map *t, long key, void *item);
-void *Map_pushf(Map *t, long key, void *item);
+void* Map_contain(Map t, long key);
+int Map_push(Map* t, long key, void* item);
+void* Map_pushf(Map* t, long key, void* item);
 void Map_print_keys(Map t);
-void *Map_delete(Map *t, long key);
+void* Map_delete(Map* t, long key);
+
+typedef struct Buf {
+  char* p;
+  int buf_len;
+  int len;
+} Buf;
+Buf* Buf_new();
+Buf* Buf_withsize(int n);
+void Buf_clear(Buf* self);
+void Buf_writec(Buf* self, char c);
+void Buf_writes(Buf* self, const char* s);
+void Buf_eof(Buf* self);
+const char* Buf_ref(Buf* self);
+char* Buf_into_str(Buf* self);
 
 // path.c
 #define MAX_PATH 512
@@ -88,6 +102,7 @@ struct Token {
 };
 #define tk_eof(tk) ((tk)->id == ID_EOF)
 Token* Token_new(IDs id, const char* pos);
+void tk2s(Token* tk, Buf* buf);
 
 extern Vec* tokenize(Context* context);
 

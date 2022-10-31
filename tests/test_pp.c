@@ -25,17 +25,15 @@ int main() {
                             context.include_path};
     Vec* tked_true = tokenize(&context_true);
 
+    Buf *buf = Buf_new(), *buf_true = Buf_new();
     for (int i = 0; i < min(pped->len, tked_true->len); i++) {
       Token* cur = Vec_get(pped, i);
       Token* cur_true = Vec_get(tked_true, i);
 
-      if (cur->id == ID_STR || cur->id == ID_IDENT ||
-          cur->id == ID_PP_INCLUDE_PATH) {
-        // int x, y;
-        // position_info(s, cur->pos, &x, &y);
-        // printf("%s:%d:%d: ", path, y, x);
-        printf("%ld: %s\n", (long)cur->corrected, cur->corrected);
-      }
+      Buf_clear(buf), Buf_clear(buf_true);
+      tk2s(cur, buf), tk2s(cur_true, buf_true);
+      printf("%s :: %s\n", Buf_ref(buf), Buf_ref(buf_true));
+
       if (cur->id != cur_true->id) {
         printf("%d |actual = %d: true = %d", i, cur->id, cur_true->id);
         abort();

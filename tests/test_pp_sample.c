@@ -1,13 +1,15 @@
-"aho" "ahoaho";
+"aho"
+    "ahoaho";
 
-"u" "n" 
-"chi";
+"u"
+    "n"
+    "chi";
 
 #include "test_pp_sample2.c"
 
-#ifdef HOGE // true
+#ifdef HOGE  // true
 
-#ifdef HUGA // false
+#ifdef HUGA  // false
 "xxxx";
 #else
 "oooo";
@@ -19,13 +21,13 @@
 
 #endif
 
-#ifndef HOGE // false
+#ifndef HOGE  // false
 
 "xx";
 
 #else
 
-#ifndef HUGA // true
+#ifndef HUGA  // true
 "ooooo";
 #else
 "xx";
@@ -33,31 +35,31 @@
 
 #endif
 
-
 #define HHH ahahah
 #undef HHH
 
-#ifdef HHH // false
+#ifdef HHH  // false
 
-#ifdef HUGA // false
+#ifdef HUGA  // false
 "xxxx";
 #else
 "oooo";
 #endif
-
+#
+#
 #else
 
 "xx";
-
+#
 #endif
 
-#ifndef HHH // true
+#ifndef HHH  // true
 
 "xx";
-
+#
 #else
 
-#ifndef HUGA // true
+#ifndef HUGA  // true
 "ooooo";
 #else
 "xx";
@@ -67,7 +69,7 @@
 
 HOGE;
 
-#ifdef COMP // false
+#ifdef COMP  // false
 
 #include <stddef.h>
 
@@ -83,14 +85,14 @@ HOGE;
 
 #pragma hoaho
 
-#ifndef AHOHO  //false
+#ifndef AHOHO  // false
 
 #define CHOHO 3
 
-#else 
+#else
 
 #define CHOHO AHOHO + 1
 
 #endif
 
-CHOHO;
+    CHOHO;
