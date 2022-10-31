@@ -51,17 +51,17 @@ int test_Dict() {
   assert(Dict_empty(dict) == false);
 
   char x[11];
-  
+
   for (int i = 0; i < 10; i++) x[i] = 'a';
   x[10] = '\0';
   assert(Dict_contain(dict, x) != NULL);
-  
+
   x[2] = 'b';
   assert(Dict_contain(dict, x) == NULL);
 
   x[2] = 'a';
-  const char* res = Dict_push(&dict, x);
-  for(int i=0; i<10; i++) assert(res[i] == 'a');
+  const char* res = Dict_push_copy(&dict, x);
+  for (int i = 0; i < 10; i++) assert(res[i] == 'a');
 
   Dict_free(dict);
 

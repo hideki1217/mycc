@@ -1,5 +1,9 @@
 "ahoahoaho";
 "unchi";
+oo;
+A;
+"oo";
+;
 "oooo";
 "ooooo";
 "xx";

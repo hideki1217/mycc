@@ -5,6 +5,28 @@
     "n"
     "chi";
 
+#define A \
+  oo;     \
+  A;
+
+A
+
+#undef A
+
+#define AAA "oo"
+#define AAA_ A##AA
+
+    AAA_;
+
+#undef AAA
+#undef AAA_
+
+#define A
+
+A;
+
+#undef A
+
 #include "test_pp_sample2.c"
 
 #ifdef HOGE  // true

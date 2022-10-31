@@ -132,9 +132,7 @@ static void Dict_rebalance(Dict *t) {
   }
 }
 
-/* insert into tree */
-/* this may replace root, which is why we pass
- * in a Dict * */
+/*もし存在したらfreeする*/
 const char *Dict_push(Dict *t, const char *key) {
   /* insertion procedure */
   if (*t == DICT_EMPTY) {
@@ -155,6 +153,7 @@ const char *Dict_push(Dict *t, const char *key) {
 
   int cmp = key_cmp(key, (*t)->key);
   if (cmp == 0) {
+    free((void *)key);
     /* nothing to do */
     return (*t)->key;
   } else {
@@ -177,7 +176,7 @@ const char *Dict_push_copy(Dict *t, const char *key) {
     (*t)->child[0] = DICT_EMPTY;
     (*t)->child[1] = DICT_EMPTY;
 
-    char* cpy = malloc(strlen(key) + 1);
+    char *cpy = malloc(strlen(key) + 1);
     strcpy(cpy, key);
     (*t)->key = cpy;
 

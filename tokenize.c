@@ -191,6 +191,12 @@ void Token_free(Token* tk) {
   Set_free(tk->hideset);
   free(tk);
 }
+Token* Token_cpy(Token* tk) {
+  Token* res = malloc(sizeof(Token));
+  memcpy(res, tk, sizeof(Token));
+  res->hideset = Set_cpy(res->hideset);
+  return res;
+}
 
 Vec* tokenize(Context* context) {
   Vec* tks = Vec_new();
@@ -432,9 +438,6 @@ Vec* tokenize(Context* context) {
 
       tk = Vec_push(tks, Token_new(ID_STR, cur));
       tk->corrected = Dict_push(&context->dict, str);
-      if (tk->corrected != str) {
-        free(str);
-      }
 
       cur = next(tmp);
       continue;

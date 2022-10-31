@@ -34,7 +34,7 @@ const char* read_text(const char* path) {
 
 #define tk2s_helper(name_) \
   if (tk->id == ID_##name_) Buf_writes(buf, S_##name_);
-void tk2s(Token* tk, Buf* buf) {
+Buf* tk2s(Token* tk, Buf* buf) {
   tk2s_helper(ADD);
   tk2s_helper(SUB);
   tk2s_helper(MUL);
@@ -162,5 +162,7 @@ void tk2s(Token* tk, Buf* buf) {
     sprintf(b, "%ld", tk->const_int);
     Buf_writes(buf, b);
   }
+
+  return buf;
 }
 #undef tk2s_helper

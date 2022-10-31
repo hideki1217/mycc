@@ -64,9 +64,12 @@ typedef struct setNode* Set;
 #define SET_EMPTY NULL
 
 #define Set_new() SET_EMPTY
-bool Set_push(Set self, long item);
+/*return *self*/
+Set Set_push(Set* self, long item);
 Set Set_cpy(Set self);
+bool Set_contain(Set self, long item);
 Set Set_union(Set self, Set rhs);
+Set Set_union_asgn(Set* self, Set rhs);
 Set Set_cross(Set self, Set rhs);
 void Set_free(Set set);
 
@@ -114,7 +117,8 @@ struct Token {
 #define tk_eof(tk) ((tk)->id == ID_EOF)
 Token* Token_new(IDs id, const char* pos);
 void Token_free(Token* tk);
-void tk2s(Token* tk, Buf* buf);
+Token* Token_cpy(Token* tk);
+Buf* tk2s(Token* tk, Buf* buf);
 
 extern Vec* tokenize(Context* context);
 
