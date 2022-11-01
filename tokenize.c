@@ -178,7 +178,7 @@ static char read_char(const char* s, const char** ls) {
   }
 }
 
-Token* Token_new(IDs id, const char* pos) {
+Token* Token_new(IDs id, Pos* pos) {
   assert(pos != NULL);
   Token* res = malloc(sizeof(Token));
   res->id = id;
@@ -197,15 +197,18 @@ Token* Token_cpy(Token* tk) {
   res->hideset = Set_cpy(res->hideset);
   return res;
 }
+#define tknew(id, pos) \
+  Token_new(id, Pos_new(context->name, (long)(pos) - (long)context->content))
 
 Vec* tokenize(Context* context) {
   Vec* tks = Vec_new();
 
   const char* cur = context->content;
-#define ERROR(pos_, ...)                                               \
-  do {                                                                 \
-    print_error(context->name, context->content, (pos_), __VA_ARGS__); \
-    abort();                                                           \
+#define ERROR(pos_, ...)                                          \
+  do {                                                            \
+    Pos p = {context->name, (long)pos_ - (long)context->content}; \
+    errorf(&p, __VA_ARGS__);                                      \
+    abort();                                                      \
   } while (false)
 
   Token* tk;
@@ -213,7 +216,7 @@ Vec* tokenize(Context* context) {
   while (*cur != '\0') {
     if (macro_mode) {
       if (*cur == '\n') {
-        tk = Vec_push(tks, Token_new(ID_PP_END, cur));
+        tk = Vec_push(tks, tknew(ID_PP_END, cur));
 
         cur = next(cur);
         macro_mode = false;
@@ -232,8 +235,9 @@ Vec* tokenize(Context* context) {
     }
     if (match(cur, &cur, S_BLCK_COML, sizeof(S_BLCK_COML) - 1)) {
       const char* tmp = find_str(cur, S_BLCK_COMR, sizeof(S_BLCK_COMR) - 1);
-      if (tmp == NULL)
+      if (tmp == NULL) {
         ERROR(cur - sizeof(S_BLCK_COML) + 1, "Comment is not closed");
+      }
       cur = next_n(tmp, sizeof(S_BLCK_COMR) - 1);
       continue;
     }
@@ -255,7 +259,7 @@ Vec* tokenize(Context* context) {
           tmp = next(tmp);
         }
 
-        tk = Vec_push(tks, Token_new(ID_PP_INCLUDE_PATH, cur));
+        tk = Vec_push(tks, tknew(ID_PP_INCLUDE_PATH, cur));
         tk->corrected = Dict_push_copy(&context->dict, path);
 
         cur = next(tmp);
@@ -267,7 +271,7 @@ Vec* tokenize(Context* context) {
   {                                                           \
     const char* tmp;                                          \
     if (match(cur, &tmp, S_##name_, sizeof(S_##name_) - 1)) { \
-      tk = Vec_push(tks, Token_new(ID_##name_, cur));         \
+      tk = Vec_push(tks, tknew(ID_##name_, cur));             \
       cur = tmp;                                              \
       continue;                                               \
     }                                                         \
@@ -324,7 +328,7 @@ Vec* tokenize(Context* context) {
   {                                                                  \
     const char* tmp;                                                 \
     if (match_strict(cur, &tmp, S_##name_, sizeof(S_##name_) - 1)) { \
-      tk = Vec_push(tks, Token_new(ID_##name_, cur));                \
+      tk = Vec_push(tks, tknew(ID_##name_, cur));                    \
       cur = tmp;                                                     \
       continue;                                                      \
     }                                                                \
@@ -360,7 +364,7 @@ Vec* tokenize(Context* context) {
     {  // PP_SYMBL
       const char* tmp;
       if (match(cur, &tmp, S_PP_SYMBL, sizeof(S_PP_SYMBL) - 1)) {
-        tk = Vec_push(tks, Token_new(ID_PP_SYMBL, cur));
+        tk = Vec_push(tks, tknew(ID_PP_SYMBL, cur));
         cur = tmp;
         macro_mode = true;
 
@@ -376,7 +380,7 @@ Vec* tokenize(Context* context) {
         {  // PP_INCLUDE
           const char* tmp;
           if (match_strict(cur, &tmp, S_PP_INCLUDE, sizeof(S_PP_INCLUDE) - 1)) {
-            tk = Vec_push(tks, Token_new(ID_PP_INCLUDE, cur));
+            tk = Vec_push(tks, tknew(ID_PP_INCLUDE, cur));
             cur = tmp;
             macro_mode = ID_PP_INCLUDE;
             continue;
@@ -392,7 +396,7 @@ Vec* tokenize(Context* context) {
       long x = strntol(cur, &tmp, 10, 128);
       if (*tmp == '.') ERROR(cur, "Not support float");
       if (tmp != cur) {
-        tk = Vec_push(tks, Token_new(ID_CONST_INT, cur));
+        tk = Vec_push(tks, tknew(ID_CONST_INT, cur));
         tk->const_int = x;
 
         cur = tmp;
@@ -403,7 +407,7 @@ Vec* tokenize(Context* context) {
       // const char* tmp;
       // double x = strntod(cur, &tmp, 128);
       // if (tmp != cur) {
-      //   tk = Vec_push(tks, Token_new(ID_CONST_FLOAT, cur));
+      //   tk = Vec_push(tks, tknew(ID_CONST_FLOAT, cur));
       //   tk->const_float = x;
       //   cur = tmp;
       //   continue;
@@ -415,7 +419,7 @@ Vec* tokenize(Context* context) {
       assert(tmp != next(cur));
       if (*tmp != '\'') ERROR(tmp, "expected \'\\\'\' ");
 
-      tk = Vec_push(tks, Token_new(ID_CONST_CHAR, cur));
+      tk = Vec_push(tks, tknew(ID_CONST_CHAR, cur));
       tk->const_int = c;
 
       cur = next(tmp);
@@ -436,7 +440,7 @@ Vec* tokenize(Context* context) {
       char* str = malloc(len + 1);
       copy_n(str, next(cur), len), str[len] = '\0';
 
-      tk = Vec_push(tks, Token_new(ID_STR, cur));
+      tk = Vec_push(tks, tknew(ID_STR, cur));
       tk->corrected = Dict_push(&context->dict, str);
 
       cur = next(tmp);
@@ -454,7 +458,7 @@ Vec* tokenize(Context* context) {
       ident[len] = '\0';
       assert(len <= MAX_IDENT);
 
-      tk = Vec_push(tks, Token_new(ID_IDENT, cur));
+      tk = Vec_push(tks, tknew(ID_IDENT, cur));
       tk->corrected = Dict_push_copy(&context->dict, ident);
 
       cur = tmp;
@@ -464,7 +468,7 @@ Vec* tokenize(Context* context) {
     ERROR(cur, "Internal Error: cannot tokenize");
   }
 
-  tk = Vec_push(tks, Token_new(ID_EOF, cur));
+  tk = Vec_push(tks, tknew(ID_EOF, cur));
   return tks;
 }
 #undef match_symbol

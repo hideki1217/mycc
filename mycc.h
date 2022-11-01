@@ -94,18 +94,23 @@ typedef struct {
 } Context;
 
 // error.c
+typedef struct {
+  const char* file;
+  int x;
+} Pos;
+Pos* Pos_new(const char* file, int x);
+void Pos_free(Pos* self);
 
-const char* position_info(const char* content, const char* pos, int* x, int* y);
-void print_error(const char* name, const char* content, const char* pos,
-                 char* fmt, ...);
-void print_warning(const char* name, const char* content, const char* pos,
-                   char* fmt, ...);
+#define MAX_LINE 256
+void get_line(Pos* p, int* x, int* y, char* line);
+void errorf(Pos* p, const char* fmt, ...);
+void warnf(Pos* p, const char* fmt, ...);
 
 // tokenize.c
 #define MAX_IDENT 128
 struct Token {
   IDs id;
-  const char* pos;
+  Pos* pos;
   Set hideset;  // 所有権あり
 
   // Ident
@@ -120,7 +125,7 @@ struct Token {
   // double const_float;
 };
 #define tk_eof(tk) ((tk)->id == ID_EOF)
-Token* Token_new(IDs id, const char* pos);
+Token* Token_new(IDs id, Pos* pos);
 void Token_free(Token* tk);
 Token* Token_cpy(Token* tk);
 Buf* tk2s(Token* tk, Buf* buf);
