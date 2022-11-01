@@ -1,6 +1,6 @@
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
 
 #include "mycc.h"
 
@@ -14,7 +14,7 @@ Vec* Vec_withsize(int size) {
 }
 static void Vec_update(Vec* self) {
   if (self->buf_len == self->len) {
-    if(self->buf_len == 0) {
+    if (self->buf_len == 0) {
       self->buf_len = 8;
       self->buf = malloc(sizeof(void*) * self->buf_len);
       return;
@@ -46,6 +46,17 @@ Vec* Vec_clear(Vec* self) {
   return self;
 }
 bool Vec_empty(const Vec* self) { return self->len == 0; }
+static void reverse(void** buf, int n) {
+  for (int i = 0; i < n / 2; i++) {
+    void* tmp = buf[i];
+    buf[i] = buf[n - 1 - i];
+    buf[n - 1 - i] = tmp;
+  }
+}
+Vec* Vec_reverse(Vec* self) {
+  reverse(self->buf, self->len);
+  return self;
+}
 void Vec_free(Vec* self) {
   free(self->buf);
   free(self);

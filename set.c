@@ -47,7 +47,7 @@ Set Set_cross(Set self, Set rhs) {
   for (Set r = rhs; r != SET_EMPTY; r = r->next) {
     for (Set l = self; l != SET_EMPTY; l = l->next) {
       if (r->item == l->item) {
-        Set_push(res, r->item);
+        Set_push(&res, r->item);
         break;
       }
     }

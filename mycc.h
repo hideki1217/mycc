@@ -5,6 +5,8 @@
 
 #include "define.h"
 
+#define TODO() abort()
+
 typedef unsigned int uint;
 typedef unsigned long ulong;
 
@@ -23,8 +25,11 @@ Vec* Vec_withsize(int size);
 void* Vec_push(Vec* self, void* x);
 void* Vec_pop(Vec* self);
 void* Vec_get(Vec* self, int idx);
+/*return self*/
 Vec* Vec_clear(Vec* self);
 bool Vec_empty(const Vec* self);
+/*return self*/
+Vec* Vec_reverse(Vec* self);
 void Vec_free(Vec* self);
 
 typedef struct DictNode* Dict;

@@ -153,7 +153,9 @@ const char *Dict_push(Dict *t, const char *key) {
 
   int cmp = key_cmp(key, (*t)->key);
   if (cmp == 0) {
-    free((void *)key);
+    if (key != (*t)->key) {
+      free((void *)key);
+    }
     /* nothing to do */
     return (*t)->key;
   } else {

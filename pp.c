@@ -98,9 +98,8 @@ static const char* find_include_path(const char* path, bool local) {
   abort();
 }
 
-#define POP(tks) ((Token*)Vec_pop(tks))
 #define CHECK_NTH(tks_, id_, x_) \
-  (((tks_)->len < (x_))          \
+  (((tks_)->len <= (x_))         \
        ? false                   \
        : (((Token**)((tks_)->buf))[(tks_)->len - 1 - (x_)]->id == id_))
 #define CHECK(tks_, id_) CHECK_NTH(tks_, id_, 0)
@@ -117,25 +116,32 @@ static bool match(const Token* input, const Token** ls, IDs id) {
   return false;
 }
 
-static void reverse(void** buf, int n) {
-  for (int i = 0; i < n / 2; i++) {
-    void* tmp = buf[i];
-    buf[i] = buf[n - 1 - i];
-    buf[n - 1 - i] = tmp;
+static int tkslen(Vec* tks) { return tks->len; }
+static Token* tksget(Vec* tks, int idx) { return Vec_get(tks, idx); }
+static Token* tkslast(Vec* tks) { return Vec_get(tks, tks->len - 1); }
+static Token* tkspop(Vec* tks) { return Vec_pop(tks); }
+static Token* tkspush(Vec* tks, Token* x) { return Vec_push(tks, x); }
+static Vec* tkscpy(Vec* ts) {
+  Vec* res = Vec_withsize(ts->len);
+  for (int i = 0; i < ts->len; i++) Vec_push(res, ts->buf[i]);
+  return res;
+}
+
+static Vec* take_until(Vec* tks, IDs id) {
+  Vec* res = Vec_new();
+  while (!CHECK(tks, id) && !Vec_empty(tks)) {
+    tkspush(res, tkspop(tks));
   }
+  assert(CHECK(tks, id));
+  return res;
 }
 
-static Vec* Vec_reverse(Vec* tks) {
-  reverse((void**)tks->buf, tks->len);
-  return tks;
-}
+static void _expand(Vec* input_r, Vec* output);
 
-void _expand(Vec* input_r, Vec* output);
-
-void expand_include(Vec* input_r, Vec* output) {
-  Token* arg = POP(input_r);
+static void expand_include(Vec* input_r, Vec* output) {
+  Token* arg = tkspop(input_r);
   assert(arg->id == ID_STR || arg->id == ID_PP_INCLUDE_PATH);
-  Token* pp_end = POP(input_r);
+  Token* pp_end = tkspop(input_r);
   assert(pp_end->id == ID_PP_END);
 
   const char* path = find_include_path(arg->corrected, (arg->id == ID_STR));
@@ -147,7 +153,7 @@ void expand_include(Vec* input_r, Vec* output) {
   Context ctx = {path, content, context->dict, context->include_path};
   Vec* tokenized = tokenize(&ctx);
 
-  Token* eof = POP(tokenized);
+  Token* eof = tkspop(tokenized);
   assert(eof->id == ID_EOF);
   Token_free(eof);
 
@@ -161,46 +167,46 @@ void expand_include(Vec* input_r, Vec* output) {
   Token_free(pp_end);
 }
 
-void add_macro(Vec* input_r) {
+static void add_macro(Vec* input_r) {
   assert(CHECK(input_r, ID_IDENT));
 
-  Token* name = POP(input_r);
+  Token* name = tkspop(input_r);
   Vec* args = NULL;
   Vec* ts = NULL;
   if (CHECK(input_r, ID_L0)) {
     // functional
-    Token_free(POP(input_r));
+    Token_free(tkspop(input_r));
 
     args = Vec_new();
     /* ((IDENT,)*(IDENT(...)? | ...)?) */
     while (CHECK2(input_r, ID_IDENT, ID_C0)) {
-      Vec_push(args, POP(input_r));
-      Token_free(POP(input_r));
+      tkspush(args, tkspop(input_r));
+      Token_free(tkspop(input_r));
     }
     if (CHECK2(input_r, ID_IDENT, ID_CCC)) {
-      Vec_push(args, POP(input_r));
-      Vec_push(args, POP(input_r));
+      tkspush(args, tkspop(input_r));
+      tkspush(args, tkspop(input_r));
     } else if (CHECK(input_r, ID_IDENT)) {
-      Vec_push(args, POP(input_r));
+      tkspush(args, tkspop(input_r));
     } else if (CHECK(input_r, ID_CCC)) {
-      Token* ccc = POP(input_r);
+      Token* ccc = tkspop(input_r);
       Token* ident = Token_new(ID_IDENT, ccc->pos);
-      ident->corrected = Dict_push(&context->dict, "__VA_ARGS__");
+      ident->corrected = Dict_push_copy(&context->dict, S_VA_ARGS);
 
-      Vec_push(args, ident);
-      Vec_push(args, ccc);
+      tkspush(args, ident);
+      tkspush(args, ccc);
     } else
       abort();
 
     assert(CHECK(input_r, ID_R0));
-    Token_free(POP(input_r));
+    Token_free(tkspop(input_r));
   }
 
   while (!CHECK(input_r, ID_PP_END)) {
     if (ts == NULL) ts = Vec_new();
-    Vec_push(ts, POP(input_r));
+    tkspush(ts, tkspop(input_r));
   }
-  Token_free(POP(input_r));  // ID_PP_END
+  Token_free(tkspop(input_r));  // ID_PP_END
 
   Macro* macro = malloc(sizeof(Macro));
   macro->args = args;
@@ -209,7 +215,7 @@ void add_macro(Vec* input_r) {
   assert(Macros_push(&macros, (long)name->corrected, macro));
 }
 
-void jump_to_else_elif_endif(Vec* input_r) {
+static void jump_to_else_elif_endif(Vec* input_r) {
   int if_count = 0;
   while (!Vec_empty(input_r)) {
     if (CHECK(input_r, ID_PP_IF) || CHECK(input_r, ID_PP_IFDEF) ||
@@ -224,13 +230,13 @@ void jump_to_else_elif_endif(Vec* input_r) {
     }
     if (CHECK(input_r, ID_PP_ENDIF) && if_count != 0) if_count--;
     assert(if_count >= 0);
-    Token_free(POP(input_r));
+    Token_free(tkspop(input_r));
   }
   assert(CHECK(input_r, ID_PP_ENDIF) || CHECK(input_r, ID_PP_ELSE) ||
          CHECK(input_r, ID_PP_ELIF));
 }
 
-void jump_to_endif(Vec* input_r) {
+static void jump_to_endif(Vec* input_r) {
   int if_count = 0;
   while (!Vec_empty(input_r)) {
     if (CHECK(input_r, ID_PP_IF) || CHECK(input_r, ID_PP_IFDEF) ||
@@ -244,34 +250,38 @@ void jump_to_endif(Vec* input_r) {
         break;
     }
     assert(if_count >= 0);
-    Token_free(POP(input_r));
+    Token_free(tkspop(input_r));
   }
   assert(CHECK(input_r, ID_PP_ENDIF));
 }
 
-int eval_if(Vec* input_r) {
-  abort();
+static int eval_if(Vec* input_r) {
+  Vec* content = take_until(input_r, ID_PP_END);
+  Vec* expr = Vec_new();
+  _expand(content, expr);
+
+  TODO();
   return 1;
 }
 
-int if_jump(Vec* input_r, bool cond) {
+static int if_jump(Vec* input_r, bool cond) {
   if (cond) {
     return 1;
   } else {
     while (true) {
       jump_to_else_elif_endif(input_r);
-      Token* key = POP(input_r);
+      Token* key = tkspop(input_r);
       if (key->id == ID_PP_ELSE) {
         Token_free(key);
         assert(CHECK(input_r, ID_PP_END));
-        Token_free(POP(input_r));
+        Token_free(tkspop(input_r));
 
         return 1;
       }
       if (key->id == ID_PP_ENDIF) {
         Token_free(key);
         assert(CHECK(input_r, ID_PP_END));
-        Token_free(POP(input_r));
+        Token_free(tkspop(input_r));
 
         return 0;
       }
@@ -279,7 +289,7 @@ int if_jump(Vec* input_r, bool cond) {
         Token_free(key);
         bool cond = eval_if(input_r);
         assert(CHECK(input_r, ID_PP_END));
-        Token_free(POP(input_r));
+        Token_free(tkspop(input_r));
 
         if (cond) {
           return 1;
@@ -289,27 +299,63 @@ int if_jump(Vec* input_r, bool cond) {
   }
 }
 
-static Vec* tokens_cpy(Vec* ts) {
-  Vec* res = Vec_withsize(ts->len);
-  for (int i = 0; i < ts->len; i++) Vec_push(res, ts->buf[i]);
-  return res;
-}
-
 static void hsadd(Vec* ts, Set hs) {
   for (int i = 0; i < ts->len; i++)
     Set_union_asgn(&((Token*)ts->buf[i])->hideset, hs);
 }
 
-static int search_arg_idx(Vec* fp, Token* tk) {
+static int search_arg(Vec* fp, Token* tk, int* elipsis) {
+  *elipsis = false;
   if (fp == NULL) return -1;
   assert(tk->id == ID_IDENT);
-  int res = 0;
   for (int i = 0; i < fp->len; i++) {
-    Token* x = Vec_get(fp, i);
-    if (x->id == ID_C0) res++;
-    if (x->corrected == tk->corrected) return res;
+    Token* x = tksget(fp, i);
+    if (x->id == ID_CCC) break;
+    if (x->corrected == tk->corrected) {
+      *elipsis = (i + 1 < fp->len) ? tksget(fp, i + 1)->id == ID_CCC : false;
+      return i;
+    }
   }
   return -1;
+}
+
+static Vec* select_arg(Vec* ap, int idx, int elipsis) {
+  static Vec* res = NULL;
+  if (res == NULL)
+    res = Vec_new();
+  else
+    Vec_clear(res);
+
+  int i = 0;
+  for (int n = 0; n < idx; i++) {
+    if (tksget(ap, i)->id == ID_C0) n++;
+  }
+  if (elipsis) {
+    for (; i < ap->len; i++) tkspush(res, Token_cpy(tksget(ap, i)));
+
+  } else {
+    for (; i < ap->len; i++) {
+      if (tksget(ap, i)->id == ID_C0) break;
+
+      tkspush(res, Token_cpy(tksget(ap, i)));
+    }
+  }
+
+  return res;
+}
+
+static Token* tkconcat(Token* lhs, Token* rhs) {
+  assert(lhs->id == ID_IDENT);
+  assert(rhs->id == ID_IDENT);
+
+  int len = strlen(lhs->corrected) + strlen(rhs->corrected);
+
+  Token* x = Token_new(ID_IDENT, lhs->pos);
+  x->corrected = Dict_push(
+      &context->dict,
+      strcat(strcpy(malloc(len + 1), lhs->corrected), rhs->corrected));
+
+  return x;
 }
 
 static Vec* subst(Vec* ts, Vec* fp, Vec* ap, Set hs) {
@@ -319,15 +365,29 @@ static Vec* subst(Vec* ts, Vec* fp, Vec* ap, Set hs) {
   if (ts == NULL) return res;
 
   int mode = 0;
+  int empty_replace = 0;
   for (int i = 0; i < ts->len; i++) {
-    Token* tk = Vec_get(ts, i);
+    Token* tk = tksget(ts, i);
 
     if (mode == ID_PP_SYMBL) {
       mode = 0;
+
       if (tk->id == ID_IDENT) {
-        int idx = search_arg_idx(fp, tk);
+        int elipsis;
+        int idx = search_arg(fp, tk, &elipsis);
         if (idx >= 0) {
-          // todo
+          Vec* ref = select_arg(ap, idx, elipsis);
+
+          Buf* buf = Buf_new();
+          for (int i = 0; i < ref->len; i++) {
+            tk2s(tksget(ref, i), buf);
+          }
+
+          Token* x = Token_new(ID_STR, tk->pos);
+          x->corrected = Dict_push(&context->dict, Buf_into_str(buf));
+          tkspush(res, x);
+
+          empty_replace = 0;
           continue;
         }
       }
@@ -336,171 +396,226 @@ static Vec* subst(Vec* ts, Vec* fp, Vec* ap, Set hs) {
 
     if (mode == ID_PP_CONCAT) {
       mode = 0;
-      assert(res->len > 0);
-      Token* l_ident = Vec_pop(res);
-      assert(l_ident->id == ID_IDENT);
-      if (tk->id == ID_IDENT) {
-        int idx = search_arg_idx(fp, tk);
+
+      if (!empty_replace) {
+        assert(res->len > 0);
+        Token* l_ident = Vec_pop(res);
+        assert(l_ident->id == ID_IDENT);
+        assert(tk->id == ID_IDENT);
+
+        int elipsis;
+        int idx = search_arg(fp, tk, &elipsis);
         if (idx >= 0) {
-          // todo
-          continue;
+          Vec* ref = select_arg(ap, idx, elipsis);
+          if (ref->len != 0) {
+            Token* x = tkconcat(l_ident, tksget(ref, 0));
+
+            tkspush(res, x);
+            for (int i = 1; i < ref->len; i++) {
+              tkspush(res, tksget(ref, i));
+            }
+          }
+        } else {
+          Token* x = tkconcat(l_ident, tk);
+          tkspush(res, x);
         }
 
-        int len = strlen(l_ident->corrected) + strlen(tk->corrected);
-        Token* x = Token_new(ID_IDENT, l_ident->pos);
-        x->corrected = Dict_push(
-            &context->dict,
-            strcat(strcpy(malloc(len + 1), l_ident->corrected), tk->corrected));
-        Vec_push(res, x);
+        Token_free(l_ident);
+        empty_replace = 0;
         continue;
       }
-      abort();
     }
 
     if (tk->id == ID_PP_SYMBL) {
       assert(mode == 0);
       mode = ID_PP_SYMBL;
+      empty_replace = 0;
       continue;
     }
     if (tk->id == ID_PP_CONCAT) {
       assert(mode == 0);
       mode = ID_PP_CONCAT;
+      empty_replace = 0;
       continue;
     }
 
-    Vec_push(res, Token_cpy(tk));
+    if (tk->id == ID_IDENT) {
+      int elipsis;
+      int idx = search_arg(fp, tk, &elipsis);
+      if (idx >= 0) {
+        Vec* ref = select_arg(ap, idx, elipsis);
+        if (ref->len == 0) {
+          empty_replace = 1;
+          continue;
+        } else {
+          _expand(Vec_reverse(ref), res);
+          empty_replace = 0;
+          continue;
+        }
+      }
+    }
+    tkspush(res, Token_cpy(tk));
   }
 
   hsadd(res, hs);
+
   Set_free(hs);
+  if (ap) {
+    for (int i = 0, len = ap->len; i < len; i++) {
+      Token_free(tkspop(ap));
+    }
+    Vec_free(ap);
+  }
+
   return res;
 }
 
-void _expand(Vec* input_r, Vec* output) {
+static bool check_args(Macro* macro, Vec* ap) {
+  Vec* fp = macro->args;
+  int elipsis = tkslast(fp)->id == ID_CCC;
+  int arg_n = fp->len - elipsis;
+
+  int n = 1;
+  for (int ap_i = 0; ap_i < ap->len; ap_i++) {
+    Token* a = tksget(ap, ap_i);
+    if (a->id == ID_C0) n++;
+  }
+
+  if (n == arg_n) return true;
+  if (n > arg_n && elipsis) return true;
+  return false;
+}
+
+static void _expand(Vec* input_r, Vec* output) {
   int if_count = 0;
   while (!Vec_empty(input_r)) {
     if (CHECK(input_r, ID_PP_SYMBL)) {
-      Token_free(POP(input_r));
+      Token_free(tkspop(input_r));
 
       if (CHECK(input_r, ID_PP_INCLUDE)) {
-        Token_free(POP(input_r));
+        Token_free(tkspop(input_r));
 
         expand_include(input_r, output);
         continue;
       }
       if (CHECK(input_r, ID_PP_DEF)) {
-        Token_free(POP(input_r));
+        Token_free(tkspop(input_r));
 
         add_macro(input_r);
         continue;
       }
       if (CHECK(input_r, ID_PP_IF)) {
-        Token_free(POP(input_r));
+        Token_free(tkspop(input_r));
 
         bool cond = eval_if(input_r);
         assert(CHECK(input_r, ID_PP_END));
-        Token_free(POP(input_r));  // ID_PP_END
+        Token_free(tkspop(input_r));  // ID_PP_END
 
         if_count += if_jump(input_r, cond);
         continue;
       }
       if (CHECK(input_r, ID_PP_IFDEF)) {
-        Token_free(POP(input_r));
+        Token_free(tkspop(input_r));
 
         assert(CHECK(input_r, ID_IDENT));
-        Token* ident = POP(input_r);
+        Token* ident = tkspop(input_r);
         bool cond = Macros_contain(macros, (long)ident->corrected) != NULL;
 
         Token_free(ident);
         assert(CHECK(input_r, ID_PP_END));
-        Token_free(POP(input_r));  // ID_PP_END
+        Token_free(tkspop(input_r));  // ID_PP_END
 
         if_count += if_jump(input_r, cond);
         continue;
       }
       if (CHECK(input_r, ID_PP_IFNDEF)) {
-        Token_free(POP(input_r));
+        Token_free(tkspop(input_r));
 
         assert(CHECK(input_r, ID_IDENT));
-        Token* ident = POP(input_r);
+        Token* ident = tkspop(input_r);
         bool cond = Macros_contain(macros, (long)ident->corrected) == NULL;
 
         Token_free(ident);
         assert(CHECK(input_r, ID_PP_END));
-        Token_free(POP(input_r));  // ID_PP_END
+        Token_free(tkspop(input_r));  // ID_PP_END
 
         if_count += if_jump(input_r, cond);
         continue;
       }
       if (CHECK(input_r, ID_PP_ELSE) || CHECK(input_r, ID_PP_ELIF)) {
-        Token_free(POP(input_r));
+        Token_free(tkspop(input_r));
 
         assert(if_count > 0);
         if_count--;
 
         jump_to_endif(input_r);
         assert(CHECK(input_r, ID_PP_ENDIF));
-        Token_free(POP(input_r));
+        Token_free(tkspop(input_r));
         assert(CHECK(input_r, ID_PP_END));
-        Token_free(POP(input_r));
+        Token_free(tkspop(input_r));
 
         continue;
       }
       if (CHECK(input_r, ID_PP_ENDIF)) {
-        Token_free(POP(input_r));
+        Token_free(tkspop(input_r));
 
         assert(if_count > 0);
         if_count--;
 
         assert(CHECK(input_r, ID_PP_END));
-        Token_free(POP(input_r));
+        Token_free(tkspop(input_r));
 
         continue;
       }
       if (CHECK(input_r, ID_PP_PRAGMA)) {
-        Token_free(POP(input_r));
-        // todo: 今はすべて無視
-        while (!CHECK(input_r, ID_PP_END)) Token_free(POP(input_r));
-        Token_free(POP(input_r));
+        Token_free(tkspop(input_r));
+        // TODO: 今はすべて無視
+        while (!CHECK(input_r, ID_PP_END)) Token_free(tkspop(input_r));
+        Token_free(tkspop(input_r));
         continue;
       }
       if (CHECK(input_r, ID_PP_UNDEF)) {
-        Token_free(POP(input_r));
+        Token_free(tkspop(input_r));
         assert(CHECK(input_r, ID_IDENT));
-        Token* ident = POP(input_r);
+        Token* ident = tkspop(input_r);
 
         Macro* macro = Macros_delete(&macros, (long)ident->corrected);
         if (macro) free(macro);
 
         Token_free(ident);
         assert(CHECK(input_r, ID_PP_END));
-        Token_free(POP(input_r));
+        Token_free(tkspop(input_r));
         continue;
       }
       if (CHECK(input_r, ID_PP_END)) {
-        Token_free(POP(input_r));
+        Token_free(tkspop(input_r));
         continue;
       }
       abort();
     }
 
-    Token* tk = POP(input_r);
+    Token* tk = tkspop(input_r);
     if (tk->id != ID_IDENT || Set_contain(tk->hideset, (long)tk->corrected)) {
-      Vec_push(output, tk);
+      tkspush(output, tk);
       continue;
     }
     Macro* macro = Macros_contain(macros, (long)tk->corrected);
     if (macro == NULL) {
-      Vec_push(output, tk);
+      tkspush(output, tk);
       continue;
     }
     Vec* expnded;
     if (macro_is_func(macro)) {
-      abort();
-      Vec* actuals = get_args(input_r);
+      if (!CHECK(input_r, ID_L0)) {
+        tkspush(output, tk);
+        continue;
+      }
+      Token_free(tkspop(input_r));
+
+      Vec* actuals = take_until(input_r, ID_R0);
       assert(check_args(macro, actuals));
-      assert(CHECK(actuals, ID_R0));
-      Token* r0 = POP(actuals);
+      assert(CHECK(input_r, ID_R0));
+      Token* r0 = tkspop(input_r);
 
       Set hs = Set_cross(tk->hideset, r0->hideset);
       hs = Set_push(&hs, (long)tk->corrected);
@@ -512,13 +627,13 @@ void _expand(Vec* input_r, Vec* output) {
       expnded = subst(macro->ts, NULL, NULL, hs);
     }
     for (int i = 0, n = expnded->len; i < n; i++)
-      Vec_push(input_r, Vec_pop(expnded));
+      tkspush(input_r, Vec_pop(expnded));
     Token_free(tk);
   }
   assert(if_count == 0);
 }
 
-Vec* expand(Vec* inputs) {
+static Vec* expand(Vec* inputs) {
   Vec* outputs = Vec_new();
   macros = Macros_new();
 
@@ -529,9 +644,9 @@ Vec* expand(Vec* inputs) {
   return outputs;
 }
 
-Vec* conbine_str(Vec* inputs) {
+static Vec* conbine_str(Vec* inputs) {
   Vec* outputs = Vec_new();
-  Vec_push(inputs, NULL);  // iterator の終了判定
+  tkspush(inputs, NULL);  // iterator の終了判定
 
   Token** input = (Token**)inputs->buf;
   while (*input != NULL) {
@@ -549,7 +664,7 @@ Vec* conbine_str(Vec* inputs) {
         combined[0] = '\0';
         for (int i = 0; i < c; i++) strcat(combined, input[i]->corrected);
 
-        Token* tk = Vec_push(outputs, Token_new(ID_STR, (*input)->pos));
+        Token* tk = tkspush(outputs, Token_new(ID_STR, (*input)->pos));
         tk->corrected = Dict_push(&context->dict, combined);
 
         for (int i = 0; i < c; i++) Token_free(input[i]);
@@ -558,7 +673,7 @@ Vec* conbine_str(Vec* inputs) {
         continue;
       }
     }
-    Token* tk = Vec_push(outputs, *input);
+    Token* tk = tkspush(outputs, *input);
     input++;
   }
   return outputs;
@@ -566,7 +681,7 @@ Vec* conbine_str(Vec* inputs) {
 
 static void remove_hs(Vec* tks) {
   for (int i = 0; i < tks->len; i++) {
-    Token* tk = Vec_get(tks, i);
+    Token* tk = tksget(tks, i);
 
     Set_free(tk->hideset);
     tk->hideset = NULL;

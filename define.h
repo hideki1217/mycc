@@ -106,6 +106,8 @@
 #define S_PP_INCLUDE "include"
 #define S_PP_DEFINED "defined"
 
+#define S_VA_ARGS "__VA_ARGS__"
+
 typedef enum ID {
   ID_ADD,
   ID_SUB,

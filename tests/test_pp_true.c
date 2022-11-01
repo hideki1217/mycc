@@ -1,5 +1,12 @@
 "ahoahoaho";
 "unchi";
+func(ahoa;);
+a, b, c, d;
+A;
+"a+3";
+1 "x+7" 4;
+"oo";
+printf("%d, %d, %s", 2, aho, "ahoaho");
 oo;
 A;
 "oo";
