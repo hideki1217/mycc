@@ -98,41 +98,28 @@ static const char* find_include_path(const char* path, bool local) {
   abort();
 }
 
-#define CHECK_NTH(tks_, id_, x_) \
-  (((tks_)->len <= (x_))         \
-       ? false                   \
-       : (((Token**)((tks_)->buf))[(tks_)->len - 1 - (x_)]->id == id_))
-#define CHECK(tks_, id_) CHECK_NTH(tks_, id_, 0)
-#define CHECK2(tks_, id0_, id1_)                                    \
-  (((tks_)->len < 2)                                                \
-       ? false                                                      \
-       : (((Token**)((tks_)->buf))[(tks_)->len - 1]->id == id0_) && \
-             (((Token**)((tks_)->buf))[(tks_)->len - 2]->id == id1_))
-static bool match(const Token* input, const Token** ls, IDs id) {
-  if (input->id == id) {
-    *ls = ++input;
-    return true;
-  }
-  return false;
-}
-
-static int tkslen(Vec* tks) { return tks->len; }
 static Token* tksget(Vec* tks, int idx) { return Vec_get(tks, idx); }
+static Token* tksget_r(Vec* tks, int idx) {
+  return Vec_get(tks, tks->len - 1 - idx);
+}
 static Token* tkslast(Vec* tks) { return Vec_get(tks, tks->len - 1); }
 static Token* tkspop(Vec* tks) { return Vec_pop(tks); }
 static Token* tkspush(Vec* tks, Token* x) { return Vec_push(tks, x); }
-static Vec* tkscpy(Vec* ts) {
-  Vec* res = Vec_withsize(ts->len);
-  for (int i = 0; i < ts->len; i++) Vec_push(res, ts->buf[i]);
-  return res;
+
+static bool check(Vec* input_r, IDs first) {
+  return input_r->len >= 1 && tksget_r(input_r, 0)->id == first;
+}
+static bool check2(Vec* input_r, IDs first, IDs second) {
+  return input_r->len >= 2 && tksget_r(input_r, 0)->id == first &&
+         tksget_r(input_r, 1)->id == second;
 }
 
-static Vec* take_until(Vec* tks, IDs id) {
+static Vec* separate(Vec* tks, IDs id) {
   Vec* res = Vec_new();
-  while (!CHECK(tks, id) && !Vec_empty(tks)) {
+  while (!check(tks, id) && !Vec_empty(tks)) {
     tkspush(res, tkspop(tks));
   }
-  assert(CHECK(tks, id));
+  assert(check(tks, id));
   return res;
 }
 
@@ -152,10 +139,11 @@ static void expand_include(Vec* input_r, Vec* output) {
   // マクロ情報だけ継承して更に展開
   Context ctx = {path, content, context->dict, context->include_path};
   Vec* tokenized = tokenize(&ctx);
-
-  Token* eof = tkspop(tokenized);
-  assert(eof->id == ID_EOF);
-  Token_free(eof);
+  {
+    Token* eof = tkspop(tokenized);
+    assert(eof->id == ID_EOF);
+    Token_free(eof);
+  }
 
   Vec_push(contexts, &ctx);
   _expand(Vec_reverse(tokenized), output);
@@ -168,27 +156,27 @@ static void expand_include(Vec* input_r, Vec* output) {
 }
 
 static void add_macro(Vec* input_r) {
-  assert(CHECK(input_r, ID_IDENT));
+  assert(check(input_r, ID_IDENT));
 
   Token* name = tkspop(input_r);
   Vec* args = NULL;
   Vec* ts = NULL;
-  if (CHECK(input_r, ID_L0)) {
+  if (check(input_r, ID_L0)) {
     // functional
     Token_free(tkspop(input_r));
 
     args = Vec_new();
     /* ((IDENT,)*(IDENT(...)? | ...)?) */
-    while (CHECK2(input_r, ID_IDENT, ID_C0)) {
+    while (check2(input_r, ID_IDENT, ID_C0)) {
       tkspush(args, tkspop(input_r));
       Token_free(tkspop(input_r));
     }
-    if (CHECK2(input_r, ID_IDENT, ID_CCC)) {
+    if (check2(input_r, ID_IDENT, ID_CCC)) {
       tkspush(args, tkspop(input_r));
       tkspush(args, tkspop(input_r));
-    } else if (CHECK(input_r, ID_IDENT)) {
+    } else if (check(input_r, ID_IDENT)) {
       tkspush(args, tkspop(input_r));
-    } else if (CHECK(input_r, ID_CCC)) {
+    } else if (check(input_r, ID_CCC)) {
       Token* ccc = tkspop(input_r);
       Token* ident = Token_new(ID_IDENT, ccc->pos);
       ident->corrected = Dict_push_copy(&context->dict, S_VA_ARGS);
@@ -198,11 +186,11 @@ static void add_macro(Vec* input_r) {
     } else
       abort();
 
-    assert(CHECK(input_r, ID_R0));
+    assert(check(input_r, ID_R0));
     Token_free(tkspop(input_r));
   }
 
-  while (!CHECK(input_r, ID_PP_END)) {
+  while (!check(input_r, ID_PP_END)) {
     if (ts == NULL) ts = Vec_new();
     tkspush(ts, tkspop(input_r));
   }
@@ -218,32 +206,32 @@ static void add_macro(Vec* input_r) {
 static void jump_to_else_elif_endif(Vec* input_r) {
   int if_count = 0;
   while (!Vec_empty(input_r)) {
-    if (CHECK(input_r, ID_PP_IF) || CHECK(input_r, ID_PP_IFDEF) ||
-        CHECK(input_r, ID_PP_IFNDEF)) {
+    if (check(input_r, ID_PP_IF) || check(input_r, ID_PP_IFDEF) ||
+        check(input_r, ID_PP_IFNDEF)) {
       if_count++;
     }
-    if (CHECK(input_r, ID_PP_ENDIF) || CHECK(input_r, ID_PP_ELSE) ||
-        CHECK(input_r, ID_PP_ELIF)) {
+    if (check(input_r, ID_PP_ENDIF) || check(input_r, ID_PP_ELSE) ||
+        check(input_r, ID_PP_ELIF)) {
       if (if_count == 0) {
         break;
       }
     }
-    if (CHECK(input_r, ID_PP_ENDIF) && if_count != 0) if_count--;
+    if (check(input_r, ID_PP_ENDIF) && if_count != 0) if_count--;
     assert(if_count >= 0);
     Token_free(tkspop(input_r));
   }
-  assert(CHECK(input_r, ID_PP_ENDIF) || CHECK(input_r, ID_PP_ELSE) ||
-         CHECK(input_r, ID_PP_ELIF));
+  assert(check(input_r, ID_PP_ENDIF) || check(input_r, ID_PP_ELSE) ||
+         check(input_r, ID_PP_ELIF));
 }
 
 static void jump_to_endif(Vec* input_r) {
   int if_count = 0;
   while (!Vec_empty(input_r)) {
-    if (CHECK(input_r, ID_PP_IF) || CHECK(input_r, ID_PP_IFDEF) ||
-        CHECK(input_r, ID_PP_IFNDEF)) {
+    if (check(input_r, ID_PP_IF) || check(input_r, ID_PP_IFDEF) ||
+        check(input_r, ID_PP_IFNDEF)) {
       if_count++;
     }
-    if (CHECK(input_r, ID_PP_ENDIF)) {
+    if (check(input_r, ID_PP_ENDIF)) {
       if (if_count != 0)
         if_count--;
       else
@@ -252,11 +240,11 @@ static void jump_to_endif(Vec* input_r) {
     assert(if_count >= 0);
     Token_free(tkspop(input_r));
   }
-  assert(CHECK(input_r, ID_PP_ENDIF));
+  assert(check(input_r, ID_PP_ENDIF));
 }
 
 static int eval_if(Vec* input_r) {
-  Vec* content = take_until(input_r, ID_PP_END);
+  Vec* content = separate(input_r, ID_PP_END);
   Vec* expr = Vec_new();
   _expand(content, expr);
 
@@ -273,14 +261,14 @@ static int if_jump(Vec* input_r, bool cond) {
       Token* key = tkspop(input_r);
       if (key->id == ID_PP_ELSE) {
         Token_free(key);
-        assert(CHECK(input_r, ID_PP_END));
+        assert(check(input_r, ID_PP_END));
         Token_free(tkspop(input_r));
 
         return 1;
       }
       if (key->id == ID_PP_ENDIF) {
         Token_free(key);
-        assert(CHECK(input_r, ID_PP_END));
+        assert(check(input_r, ID_PP_END));
         Token_free(tkspop(input_r));
 
         return 0;
@@ -288,7 +276,7 @@ static int if_jump(Vec* input_r, bool cond) {
       if (key->id == ID_PP_ELIF) {
         Token_free(key);
         bool cond = eval_if(input_r);
-        assert(CHECK(input_r, ID_PP_END));
+        assert(check(input_r, ID_PP_END));
         Token_free(tkspop(input_r));
 
         if (cond) {
@@ -489,105 +477,105 @@ static bool check_args(Macro* macro, Vec* ap) {
 static void _expand(Vec* input_r, Vec* output) {
   int if_count = 0;
   while (!Vec_empty(input_r)) {
-    if (CHECK(input_r, ID_PP_SYMBL)) {
+    if (check(input_r, ID_PP_SYMBL)) {
       Token_free(tkspop(input_r));
 
-      if (CHECK(input_r, ID_PP_INCLUDE)) {
+      if (check(input_r, ID_PP_INCLUDE)) {
         Token_free(tkspop(input_r));
 
         expand_include(input_r, output);
         continue;
       }
-      if (CHECK(input_r, ID_PP_DEF)) {
+      if (check(input_r, ID_PP_DEF)) {
         Token_free(tkspop(input_r));
 
         add_macro(input_r);
         continue;
       }
-      if (CHECK(input_r, ID_PP_IF)) {
+      if (check(input_r, ID_PP_IF)) {
         Token_free(tkspop(input_r));
 
         bool cond = eval_if(input_r);
-        assert(CHECK(input_r, ID_PP_END));
+        assert(check(input_r, ID_PP_END));
         Token_free(tkspop(input_r));  // ID_PP_END
 
         if_count += if_jump(input_r, cond);
         continue;
       }
-      if (CHECK(input_r, ID_PP_IFDEF)) {
+      if (check(input_r, ID_PP_IFDEF)) {
         Token_free(tkspop(input_r));
 
-        assert(CHECK(input_r, ID_IDENT));
+        assert(check(input_r, ID_IDENT));
         Token* ident = tkspop(input_r);
         bool cond = Macros_contain(macros, (long)ident->corrected) != NULL;
 
         Token_free(ident);
-        assert(CHECK(input_r, ID_PP_END));
+        assert(check(input_r, ID_PP_END));
         Token_free(tkspop(input_r));  // ID_PP_END
 
         if_count += if_jump(input_r, cond);
         continue;
       }
-      if (CHECK(input_r, ID_PP_IFNDEF)) {
+      if (check(input_r, ID_PP_IFNDEF)) {
         Token_free(tkspop(input_r));
 
-        assert(CHECK(input_r, ID_IDENT));
+        assert(check(input_r, ID_IDENT));
         Token* ident = tkspop(input_r);
         bool cond = Macros_contain(macros, (long)ident->corrected) == NULL;
 
         Token_free(ident);
-        assert(CHECK(input_r, ID_PP_END));
+        assert(check(input_r, ID_PP_END));
         Token_free(tkspop(input_r));  // ID_PP_END
 
         if_count += if_jump(input_r, cond);
         continue;
       }
-      if (CHECK(input_r, ID_PP_ELSE) || CHECK(input_r, ID_PP_ELIF)) {
+      if (check(input_r, ID_PP_ELSE) || check(input_r, ID_PP_ELIF)) {
         Token_free(tkspop(input_r));
 
         assert(if_count > 0);
         if_count--;
 
         jump_to_endif(input_r);
-        assert(CHECK(input_r, ID_PP_ENDIF));
+        assert(check(input_r, ID_PP_ENDIF));
         Token_free(tkspop(input_r));
-        assert(CHECK(input_r, ID_PP_END));
+        assert(check(input_r, ID_PP_END));
         Token_free(tkspop(input_r));
 
         continue;
       }
-      if (CHECK(input_r, ID_PP_ENDIF)) {
+      if (check(input_r, ID_PP_ENDIF)) {
         Token_free(tkspop(input_r));
 
         assert(if_count > 0);
         if_count--;
 
-        assert(CHECK(input_r, ID_PP_END));
+        assert(check(input_r, ID_PP_END));
         Token_free(tkspop(input_r));
 
         continue;
       }
-      if (CHECK(input_r, ID_PP_PRAGMA)) {
+      if (check(input_r, ID_PP_PRAGMA)) {
         Token_free(tkspop(input_r));
         // TODO: 今はすべて無視
-        while (!CHECK(input_r, ID_PP_END)) Token_free(tkspop(input_r));
+        while (!check(input_r, ID_PP_END)) Token_free(tkspop(input_r));
         Token_free(tkspop(input_r));
         continue;
       }
-      if (CHECK(input_r, ID_PP_UNDEF)) {
+      if (check(input_r, ID_PP_UNDEF)) {
         Token_free(tkspop(input_r));
-        assert(CHECK(input_r, ID_IDENT));
+        assert(check(input_r, ID_IDENT));
         Token* ident = tkspop(input_r);
 
         Macro* macro = Macros_delete(&macros, (long)ident->corrected);
         if (macro) free(macro);
 
         Token_free(ident);
-        assert(CHECK(input_r, ID_PP_END));
+        assert(check(input_r, ID_PP_END));
         Token_free(tkspop(input_r));
         continue;
       }
-      if (CHECK(input_r, ID_PP_END)) {
+      if (check(input_r, ID_PP_END)) {
         Token_free(tkspop(input_r));
         continue;
       }
@@ -606,15 +594,15 @@ static void _expand(Vec* input_r, Vec* output) {
     }
     Vec* expnded;
     if (macro_is_func(macro)) {
-      if (!CHECK(input_r, ID_L0)) {
+      if (!check(input_r, ID_L0)) {
         tkspush(output, tk);
         continue;
       }
       Token_free(tkspop(input_r));
 
-      Vec* actuals = take_until(input_r, ID_R0);
+      Vec* actuals = separate(input_r, ID_R0);
       assert(check_args(macro, actuals));
-      assert(CHECK(input_r, ID_R0));
+      assert(check(input_r, ID_R0));
       Token* r0 = tkspop(input_r);
 
       Set hs = Set_cross(tk->hideset, r0->hideset);
